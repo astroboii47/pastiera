@@ -227,6 +227,8 @@ object PreferenceSchemas {
             "additional_ime_subtypes" to PreferenceValueType.STRING_SET,
             "clipboard_history_enabled" to PreferenceValueType.BOOLEAN,
             "clipboard_retention_time" to PreferenceValueType.LONG,
+            "emoji_shortcode_enabled" to PreferenceValueType.BOOLEAN,
+            "symbol_shortcode_enabled" to PreferenceValueType.BOOLEAN,
             "trackpad_gestures_enabled" to PreferenceValueType.BOOLEAN,
             "trackpad_swipe_threshold" to PreferenceValueType.FLOAT,
             "pastierina_mode_override" to PreferenceValueType.STRING,

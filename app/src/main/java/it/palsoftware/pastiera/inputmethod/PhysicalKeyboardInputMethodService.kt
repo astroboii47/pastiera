@@ -50,6 +50,8 @@ import java.util.Locale
 import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodSubtype
 import it.palsoftware.pastiera.clipboard.ClipboardHistoryManager
+import it.palsoftware.pastiera.emoji.EmojiShortcodeManager
+import it.palsoftware.pastiera.inputmethod.ui.EmojiShortcodePopup
 import android.content.pm.PackageManager
 import rikka.shizuku.Shizuku
 
@@ -186,6 +188,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     private lateinit var keyboardVisibilityController: KeyboardVisibilityController
     private lateinit var launcherShortcutController: LauncherShortcutController
     private lateinit var clipboardHistoryManager: ClipboardHistoryManager
+    private lateinit var emojiShortcodeManager: EmojiShortcodeManager
+    private var emojiShortcodePopup: EmojiShortcodePopup? = null
     private var latestSuggestions: List<String> = emptyList()
     private var clearAltOnSpaceEnabled: Boolean = false
     private var isLanguageSwitchInProgress: Boolean = false
@@ -802,6 +806,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         // Initialize clipboard history manager first (needed by candidatesBarController)
         clipboardHistoryManager = ClipboardHistoryManager(this)
         clipboardHistoryManager.onCreate()
+        emojiShortcodeManager = EmojiShortcodeManager(this)
 
         candidatesBarController = CandidatesBarController(this, clipboardHistoryManager, assets, PhysicalKeyboardInputMethodService::class.java)
         candidatesBarController.onAddUserWord = { word ->
@@ -1272,6 +1277,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         speechRecognitionManager = null
 
         // Cleanup ClipboardHistoryManager
+        emojiShortcodePopup?.dismiss()
         clipboardHistoryManager.setHistoryChangeListener(null)
         clipboardHistoryManager.onDestroy()
 
@@ -1462,6 +1468,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         super.onStartInput(info, restarting)
         
         currentPackageName = info?.packageName
+        emojiShortcodePopup?.dismiss()
         
         // Reset clipboard overlay when starting new input
 
@@ -2065,6 +2072,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         }
         
         if (cursorPositionChanged && collapsedSelection && !shouldSkipForCommit) {
+            checkAndShowEmojiShortcode()
             if (symPage == 4 && ::candidatesBarController.isInitialized) {
                 // User likely tapped/moved cursor in the target app text field: return hardware typing to app.
                 candidatesBarController.disableEmojiPickerSearchInputCapture()
@@ -2102,6 +2110,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             onUpdateStatusBar = { updateStatusBarText() },
             inputContextState = state
         )
+
+        if (!collapsedSelection) {
+            emojiShortcodePopup?.dismiss()
+        }
     }
 
     private fun remapHardwareEvent(keyCode: Int, event: KeyEvent?): Pair<Int, KeyEvent?> {
@@ -2156,6 +2168,19 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             candidatesBarController.handleEmojiPickerSearchKeyDown(event)
         ) {
             return true
+        }
+
+        if (emojiShortcodePopup?.isShowing() == true) {
+            if (keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                emojiShortcodePopup?.dismiss()
+                if (keyCode == KeyEvent.KEYCODE_DEL) {
+                    return false
+                }
+                return true
+            }
+            if (emojiShortcodePopup?.handlePhysicalKey(keyCode, event) == true) {
+                return true
+            }
         }
 
         if (hasEditableField && keyCode == KEYCODE_SYM && event?.repeatCount == 0) {
@@ -2290,7 +2315,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             InputEventRouter.EditableFieldRoutingResult.CallSuper -> return super.onKeyDown(keyCode, event)
             InputEventRouter.EditableFieldRoutingResult.Continue -> {}
         }
-        
+
         // Handle Ctrl+Space for subtype cycling
         if (
             hasEditableField &&
@@ -2385,11 +2410,13 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                     editorInfo = info
                 ) { updateStatusBarText() }
             ) {
+                checkAndShowEmojiShortcode()
                 return true
             }
         }
 
         if (!altActiveNow && !ctrlActiveNow && handleVietnameseTelexKey(keyCode, event, ic)) {
+            checkAndShowEmojiShortcode()
             return true
         }
         
@@ -2654,6 +2681,71 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         }
         
         return super.onKeyUp(keyCode, event)
+    }
+
+    private fun checkAndShowEmojiShortcode() {
+        if (!::emojiShortcodeManager.isInitialized) return
+
+        val emojiEnabled = SettingsManager.getEmojiShortcodeEnabled(this)
+        val symbolEnabled = SettingsManager.getSymbolShortcodeEnabled(this)
+        if (!emojiEnabled && !symbolEnabled) {
+            emojiShortcodePopup?.dismiss()
+            return
+        }
+
+        val inputConnection = currentInputConnection ?: return
+        val textBeforeCursor = inputConnection.getTextBeforeCursor(100, 0)?.toString() ?: return
+        val (shortcode, _) = emojiShortcodeManager.extractCurrentShortcode(textBeforeCursor) ?: run {
+            emojiShortcodePopup?.dismiss()
+            return
+        }
+
+        val filteredSuggestions = emojiShortcodeManager.searchShortcodes(shortcode, 10).filter { (character, _) ->
+            val codePoint = character.codePointAt(0)
+            when {
+                emojiEnabled && symbolEnabled -> true
+                emojiEnabled -> character.length > 1 || codePoint > 0x1F000
+                symbolEnabled -> codePoint < 0x1F000 || codePoint > 0x1FFFF
+                else -> false
+            }
+        }
+
+        if (filteredSuggestions.isEmpty()) {
+            emojiShortcodePopup?.dismiss()
+            return
+        }
+
+        val anchorView = window?.window?.decorView ?: return
+        if (emojiShortcodePopup?.isShowing() == true) {
+            emojiShortcodePopup?.updateSuggestions(filteredSuggestions)
+        } else {
+            emojiShortcodePopup = EmojiShortcodePopup(
+                context = this,
+                onEmojiSelected = { character, selectedShortcode ->
+                    replaceShortcodeWithEmoji(character, selectedShortcode)
+                },
+                onDismiss = {
+                    emojiShortcodePopup = null
+                }
+            ).also { popup ->
+                popup.show(anchorView, filteredSuggestions)
+            }
+        }
+    }
+
+    private fun replaceShortcodeWithEmoji(emoji: String, shortcode: String) {
+        val inputConnection = currentInputConnection ?: return
+        val textBeforeCursor = inputConnection.getTextBeforeCursor(100, 0)?.toString() ?: return
+        val lastColonIndex = textBeforeCursor.lastIndexOf(':')
+        if (lastColonIndex == -1) return
+
+        val charsToDelete = textBeforeCursor.length - lastColonIndex
+        inputConnection.beginBatchEdit()
+        inputConnection.deleteSurroundingText(charsToDelete, 0)
+        markSelectionUpdateSkipAfterCommit()
+        inputConnection.commitText(emoji, 1)
+        inputConnection.endBatchEdit()
+        emojiShortcodePopup?.dismiss()
     }
 
     /**

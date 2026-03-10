@@ -48,6 +48,14 @@ fun TextInputSettingsScreen(
     var clearAltOnSpace by remember {
         mutableStateOf(SettingsManager.getClearAltOnSpace(context))
     }
+
+    var emojiShortcodeEnabled by remember {
+        mutableStateOf(SettingsManager.getEmojiShortcodeEnabled(context))
+    }
+
+    var symbolShortcodeEnabled by remember {
+        mutableStateOf(SettingsManager.getSymbolShortcodeEnabled(context))
+    }
     
     var swipeToDelete by remember {
         mutableStateOf(SettingsManager.getSwipeToDelete(context))
@@ -234,6 +242,90 @@ fun TextInputSettingsScreen(
                         onCheckedChange = { enabled ->
                             doubleSpaceToPeriod = enabled
                             SettingsManager.setDoubleSpaceToPeriod(context, enabled)
+                        }
+                    )
+                }
+            }
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.TextFields,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.emoji_shortcodes_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = stringResource(R.string.emoji_shortcodes_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                    Switch(
+                        checked = emojiShortcodeEnabled,
+                        onCheckedChange = { enabled ->
+                            emojiShortcodeEnabled = enabled
+                            SettingsManager.setEmojiShortcodeEnabled(context, enabled)
+                        }
+                    )
+                }
+            }
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.TextFields,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.symbol_shortcodes_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = stringResource(R.string.symbol_shortcodes_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                    Switch(
+                        checked = symbolShortcodeEnabled,
+                        onCheckedChange = { enabled ->
+                            symbolShortcodeEnabled = enabled
+                            SettingsManager.setSymbolShortcodeEnabled(context, enabled)
                         }
                     )
                 }

@@ -52,6 +52,8 @@ object SettingsManager {
     private const val KEY_ADDITIONAL_IME_SUBTYPES = "additional_ime_subtypes" // Comma-separated list of language codes for additional IME subtypes
     private const val KEY_CLIPBOARD_HISTORY_ENABLED = "clipboard_history_enabled" // Whether clipboard history is enabled
     private const val KEY_CLIPBOARD_RETENTION_TIME = "clipboard_retention_time" // How long to keep clipboard entries (in minutes)
+    private const val KEY_EMOJI_SHORTCODE_ENABLED = "emoji_shortcode_enabled" // Enable emoji shortcodes (:smile: -> 😊)
+    private const val KEY_SYMBOL_SHORTCODE_ENABLED = "symbol_shortcode_enabled" // Enable symbol shortcodes (:tm: -> ™)
     private const val KEY_TRACKPAD_GESTURES_ENABLED = "trackpad_gestures_enabled" // Whether trackpad gesture suggestions are enabled
     private const val KEY_TRACKPAD_SWIPE_THRESHOLD = "trackpad_swipe_threshold" // Threshold for swipe detection on trackpad
     private const val KEY_SHIFT_BACKSPACE_DELETE = "shift_backspace_delete" // Shift + Backspace performs forward delete
@@ -125,6 +127,8 @@ object SettingsManager {
     private const val DEFAULT_IME_OVERLAY_DEBUG_LOGGING = false
     private const val DEFAULT_CLIPBOARD_HISTORY_ENABLED = true
     private const val DEFAULT_CLIPBOARD_RETENTION_TIME = 120L // 2 hours in minutes
+    private const val DEFAULT_EMOJI_SHORTCODE_ENABLED = true
+    private const val DEFAULT_SYMBOL_SHORTCODE_ENABLED = true
     private const val DEFAULT_TRACKPAD_GESTURES_ENABLED = false
     private const val DEFAULT_TRACKPAD_SWIPE_THRESHOLD = 300f
     private const val MIN_TRACKPAD_SWIPE_THRESHOLD = 120f
@@ -1898,6 +1902,26 @@ object SettingsManager {
     fun setClipboardRetentionTime(context: Context, minutes: Long) {
         getPreferences(context).edit()
             .putLong(KEY_CLIPBOARD_RETENTION_TIME, minutes)
+            .apply()
+    }
+
+    fun getEmojiShortcodeEnabled(context: Context): Boolean {
+        return getPreferences(context).getBoolean(KEY_EMOJI_SHORTCODE_ENABLED, DEFAULT_EMOJI_SHORTCODE_ENABLED)
+    }
+
+    fun setEmojiShortcodeEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_EMOJI_SHORTCODE_ENABLED, enabled)
+            .apply()
+    }
+
+    fun getSymbolShortcodeEnabled(context: Context): Boolean {
+        return getPreferences(context).getBoolean(KEY_SYMBOL_SHORTCODE_ENABLED, DEFAULT_SYMBOL_SHORTCODE_ENABLED)
+    }
+
+    fun setSymbolShortcodeEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_SYMBOL_SHORTCODE_ENABLED, enabled)
             .apply()
     }
 

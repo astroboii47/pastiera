@@ -35,6 +35,10 @@
     <!-- Double Space to Period Section -->
     <string name="double_space_to_period_title">Double Space to Period</string>
     <string name="double_space_to_period_description">Double tap space to insert a period followed by a space and capitalize the next letter.</string>
+    <string name="emoji_shortcodes_title">Emoji Shortcodes</string>
+    <string name="emoji_shortcodes_description">Type :smile: to insert 😊 while typing.</string>
+    <string name="symbol_shortcodes_title">Symbol Shortcodes</string>
+    <string name="symbol_shortcodes_description">Type :tm: for ™ or :copy: for ©.</string>
 
     <!-- Clear Alt on Space Section -->
     <string name="clear_alt_on_space_title">Clear Alt on Space</string>
