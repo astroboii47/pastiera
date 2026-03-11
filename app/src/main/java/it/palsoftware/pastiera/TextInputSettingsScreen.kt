@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -56,6 +57,13 @@ fun TextInputSettingsScreen(
     var symbolShortcodeEnabled by remember {
         mutableStateOf(SettingsManager.getSymbolShortcodeEnabled(context))
     }
+
+    var klipyApiKey by remember {
+        mutableStateOf(SettingsManager.getKlipyApiKey(context))
+    }
+
+    var showKlipyDialog by remember { mutableStateOf(false) }
+    var pendingKlipyApiKey by remember { mutableStateOf(klipyApiKey) }
     
     var swipeToDelete by remember {
         mutableStateOf(SettingsManager.getSwipeToDelete(context))
@@ -114,6 +122,51 @@ fun TextInputSettingsScreen(
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(start = 8.dp)
                     )
+                }
+            }
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Keyboard,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.klipy_api_key_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = if (klipyApiKey.isBlank()) {
+                                stringResource(R.string.klipy_api_key_missing_description)
+                            } else {
+                                stringResource(R.string.klipy_api_key_configured_description)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2
+                        )
+                    }
+                    TextButton(onClick = {
+                        pendingKlipyApiKey = klipyApiKey
+                        showKlipyDialog = true
+                    }) {
+                        Text(stringResource(R.string.klipy_api_key_edit))
+                    }
                 }
             }
         }
@@ -593,5 +646,54 @@ fun TextInputSettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    if (showKlipyDialog) {
+        AlertDialog(
+            onDismissRequest = { showKlipyDialog = false },
+            title = {
+                Text(text = stringResource(R.string.klipy_api_key_title))
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(R.string.klipy_api_key_dialog_description),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    OutlinedTextField(
+                        value = pendingKlipyApiKey,
+                        onValueChange = { pendingKlipyApiKey = it },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        label = { Text(stringResource(R.string.klipy_api_key_field_label)) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    klipyApiKey = pendingKlipyApiKey.trim()
+                    SettingsManager.setKlipyApiKey(context, klipyApiKey)
+                    showKlipyDialog = false
+                }) {
+                    Text(stringResource(R.string.save))
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        klipyApiKey = ""
+                        pendingKlipyApiKey = ""
+                        SettingsManager.setKlipyApiKey(context, "")
+                        showKlipyDialog = false
+                    }) {
+                        Text(stringResource(R.string.clear))
+                    }
+                    TextButton(onClick = { showKlipyDialog = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            }
+        )
     }
 }

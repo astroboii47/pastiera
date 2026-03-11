@@ -54,6 +54,7 @@ object SettingsManager {
     private const val KEY_CLIPBOARD_RETENTION_TIME = "clipboard_retention_time" // How long to keep clipboard entries (in minutes)
     private const val KEY_EMOJI_SHORTCODE_ENABLED = "emoji_shortcode_enabled" // Enable emoji shortcodes (:smile: -> 😊)
     private const val KEY_SYMBOL_SHORTCODE_ENABLED = "symbol_shortcode_enabled" // Enable symbol shortcodes (:tm: -> ™)
+    private const val KEY_KLIPY_API_KEY = "klipy_api_key" // API key used for GIF search
     private const val KEY_TRACKPAD_GESTURES_ENABLED = "trackpad_gestures_enabled" // Whether trackpad gesture suggestions are enabled
     private const val KEY_TRACKPAD_SWIPE_THRESHOLD = "trackpad_swipe_threshold" // Threshold for swipe detection on trackpad
     private const val KEY_SHIFT_BACKSPACE_DELETE = "shift_backspace_delete" // Shift + Backspace performs forward delete
@@ -129,6 +130,7 @@ object SettingsManager {
     private const val DEFAULT_CLIPBOARD_RETENTION_TIME = 120L // 2 hours in minutes
     private const val DEFAULT_EMOJI_SHORTCODE_ENABLED = true
     private const val DEFAULT_SYMBOL_SHORTCODE_ENABLED = true
+    private const val DEFAULT_KLIPY_API_KEY = ""
     private const val DEFAULT_TRACKPAD_GESTURES_ENABLED = false
     private const val DEFAULT_TRACKPAD_SWIPE_THRESHOLD = 300f
     private const val MIN_TRACKPAD_SWIPE_THRESHOLD = 120f
@@ -1711,6 +1713,7 @@ object SettingsManager {
             val symbolsEnabled = jsonObject.optBoolean("symbolsEnabled", true)
             val clipboardEnabled = jsonObject.optBoolean("clipboardEnabled", false)
             val emojiPickerEnabled = jsonObject.optBoolean("emojiPickerEnabled", false)
+            val gifPickerEnabled = jsonObject.optBoolean("gifPickerEnabled", false)
             val legacyEmojiFirst = jsonObject.optBoolean("emojiFirst", true)
 
             val parsedOrder = if (jsonObject.has("symPageOrder")) {
@@ -1735,7 +1738,7 @@ object SettingsManager {
                 if (!legacyEmojiFirst) {
                     cyclePages.reverse()
                 }
-                cyclePages + SymPagesConfig.PAGE_EMOJI_PICKER
+                cyclePages + SymPagesConfig.PAGE_EMOJI_PICKER + SymPagesConfig.PAGE_GIF_PICKER
             }
 
             SymPagesConfig(
@@ -1743,6 +1746,7 @@ object SettingsManager {
                 symbolsEnabled = symbolsEnabled,
                 clipboardEnabled = clipboardEnabled,
                 emojiPickerEnabled = emojiPickerEnabled,
+                gifPickerEnabled = gifPickerEnabled,
                 symPageOrder = parsedOrder
             )
         } catch (e: Exception) {
@@ -1761,6 +1765,7 @@ object SettingsManager {
                 put("symbolsEnabled", config.symbolsEnabled)
                 put("clipboardEnabled", config.clipboardEnabled)
                 put("emojiPickerEnabled", config.emojiPickerEnabled)
+                put("gifPickerEnabled", config.gifPickerEnabled)
                 // Keep legacy field for backward compatibility with older builds.
                 put("emojiFirst", config.prefersEmojiLongPressLayer())
                 val orderArray = org.json.JSONArray()
@@ -1922,6 +1927,16 @@ object SettingsManager {
     fun setSymbolShortcodeEnabled(context: Context, enabled: Boolean) {
         getPreferences(context).edit()
             .putBoolean(KEY_SYMBOL_SHORTCODE_ENABLED, enabled)
+            .apply()
+    }
+
+    fun getKlipyApiKey(context: Context): String {
+        return getPreferences(context).getString(KEY_KLIPY_API_KEY, DEFAULT_KLIPY_API_KEY) ?: DEFAULT_KLIPY_API_KEY
+    }
+
+    fun setKlipyApiKey(context: Context, apiKey: String) {
+        getPreferences(context).edit()
+            .putString(KEY_KLIPY_API_KEY, apiKey.trim())
             .apply()
     }
 

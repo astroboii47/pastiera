@@ -22,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import android.os.Handler
 import android.os.Looper
 import android.view.View
@@ -50,6 +51,8 @@ import java.util.Locale
 import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodSubtype
 import it.palsoftware.pastiera.clipboard.ClipboardHistoryManager
+import it.palsoftware.pastiera.gif.GifContentSender
+import it.palsoftware.pastiera.gif.KlipyGifResult
 import it.palsoftware.pastiera.emoji.EmojiShortcodeManager
 import it.palsoftware.pastiera.inputmethod.ui.EmojiShortcodePopup
 import android.content.pm.PackageManager
@@ -188,6 +191,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     private lateinit var keyboardVisibilityController: KeyboardVisibilityController
     private lateinit var launcherShortcutController: LauncherShortcutController
     private lateinit var clipboardHistoryManager: ClipboardHistoryManager
+    private lateinit var gifContentSender: GifContentSender
     private lateinit var emojiShortcodeManager: EmojiShortcodeManager
     private var emojiShortcodePopup: EmojiShortcodePopup? = null
     private var latestSuggestions: List<String> = emptyList()
@@ -806,6 +810,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         // Initialize clipboard history manager first (needed by candidatesBarController)
         clipboardHistoryManager = ClipboardHistoryManager(this)
         clipboardHistoryManager.onCreate()
+        gifContentSender = GifContentSender(this)
         emojiShortcodeManager = EmojiShortcodeManager(this)
 
         candidatesBarController = CandidatesBarController(this, clipboardHistoryManager, assets, PhysicalKeyboardInputMethodService::class.java)
@@ -909,6 +914,9 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             // Toggle symbols as SYM page 2
             symLayoutController.openSymbolsPage()
             updateStatusBarText()
+        }
+        candidatesBarController.onGifSelected = { result ->
+            sendGifResult(result)
         }
         candidatesBarController.onMinimalUiToggleRequested = {
             keyboardVisibilityController.toggleUserMinimalUi()
@@ -2073,9 +2081,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         
         if (cursorPositionChanged && collapsedSelection && !shouldSkipForCommit) {
             checkAndShowEmojiShortcode()
-            if (symPage == 4 && ::candidatesBarController.isInitialized) {
+            if ((symPage == 4 || symPage == 5) && ::candidatesBarController.isInitialized) {
                 // User likely tapped/moved cursor in the target app text field: return hardware typing to app.
                 candidatesBarController.disableEmojiPickerSearchInputCapture()
+                candidatesBarController.disableGifPickerSearchInputCapture()
             }
             // Update suggestions on cursor movement (if suggestions enabled)
             if (!state.shouldDisableSuggestions) {
@@ -2166,6 +2175,17 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             keyCode != KEYCODE_SYM &&
             ::candidatesBarController.isInitialized &&
             candidatesBarController.handleEmojiPickerSearchKeyDown(event)
+        ) {
+            return true
+        }
+
+        if (
+            hasEditableField &&
+            symPage == 5 &&
+            keyCode != KeyEvent.KEYCODE_BACK &&
+            keyCode != KEYCODE_SYM &&
+            ::candidatesBarController.isInitialized &&
+            candidatesBarController.handleGifPickerSearchKeyDown(event)
         ) {
             return true
         }
@@ -2505,6 +2525,17 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         ) {
             return true
         }
+
+        if (
+            hasEditableField &&
+            symPage == 5 &&
+            keyCode != KeyEvent.KEYCODE_BACK &&
+            keyCode != KEYCODE_SYM &&
+            ::candidatesBarController.isInitialized &&
+            candidatesBarController.shouldConsumeGifPickerSearchKeyUp(event)
+        ) {
+            return true
+        }
         
         // If NO editable field is active, handle ONLY nav mode Ctrl release
         if (!hasEditableField) {
@@ -2746,6 +2777,45 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         inputConnection.commitText(emoji, 1)
         inputConnection.endBatchEdit()
         emojiShortcodePopup?.dismiss()
+    }
+
+    private fun sendGifResult(result: KlipyGifResult) {
+        val inputConnection = currentInputConnection
+        val editorInfo = currentInputEditorInfo
+        if (inputConnection == null) {
+            gifContentSender.copyFallbackLink(result)
+            android.widget.Toast.makeText(this, getString(R.string.gif_picker_link_copied), android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        CoroutineScope(Dispatchers.Main).launch {
+            val committed = if (gifContentSender.supportsGifCommit(editorInfo)) {
+                runCatching {
+                    val preparedGif = withContext(Dispatchers.IO) {
+                        gifContentSender.prepareGif(result)
+                    }
+                    val nonNullEditorInfo = editorInfo ?: return@runCatching false
+                    gifContentSender.commitPreparedGif(preparedGif, inputConnection, nonNullEditorInfo)
+                }.getOrDefault(false)
+            } else {
+                false
+            }
+
+            if (committed) {
+                android.widget.Toast.makeText(
+                    this@PhysicalKeyboardInputMethodService,
+                    getString(R.string.gif_picker_sent),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                gifContentSender.insertFallbackLink(result, inputConnection)
+                android.widget.Toast.makeText(
+                    this@PhysicalKeyboardInputMethodService,
+                    getString(R.string.gif_picker_fallback_link_inserted),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
     }
 
     /**

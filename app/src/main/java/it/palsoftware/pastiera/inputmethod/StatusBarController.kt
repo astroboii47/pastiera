@@ -33,6 +33,7 @@ import android.view.inputmethod.InputMethodManager
 import kotlin.math.abs
 import it.palsoftware.pastiera.inputmethod.ui.ClipboardHistoryView
 import it.palsoftware.pastiera.inputmethod.ui.EmojiPickerView
+import it.palsoftware.pastiera.inputmethod.ui.GifPickerView
 import it.palsoftware.pastiera.inputmethod.ui.HamburgerMenuView
 import it.palsoftware.pastiera.inputmethod.ui.LedStatusView
 import it.palsoftware.pastiera.inputmethod.ui.VariationBarView
@@ -46,6 +47,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import it.palsoftware.pastiera.SettingsActivity
+import it.palsoftware.pastiera.gif.KlipyGifClient
+import it.palsoftware.pastiera.gif.KlipyGifResult
 
 /**
  * Manages the status bar shown by the IME, handling view creation
@@ -107,6 +110,8 @@ class StatusBarController(
             field = value
             variationBarView?.onEmojiPickerRequested = value
         }
+
+    var onGifSelected: ((KlipyGifResult) -> Unit)? = null
     
     var onSymbolsPageRequested: (() -> Unit)? = null
         set(value) {
@@ -230,6 +235,7 @@ class StatusBarController(
     private var clipboardHistoryView: ClipboardHistoryView? = null
     private var lastClipboardCountRendered: Int = -1
     private var emojiPickerView: EmojiPickerView? = null
+    private var gifPickerView: GifPickerView? = null
     private var emojiKeyButtons: MutableList<View> = mutableListOf()
     private var lastSymPageRendered: Int = 0
     private var lastSymMappingsRendered: Map<Int, String>? = null
@@ -507,6 +513,20 @@ class StatusBarController(
         emojiPickerView?.disableSearchInputCapture()
     }
 
+    fun handleGifPickerSearchKeyDown(event: KeyEvent?): Boolean {
+        if (event == null) return false
+        return gifPickerView?.handleSearchKeyDown(event) == true
+    }
+
+    fun shouldConsumeGifPickerSearchKeyUp(event: KeyEvent?): Boolean {
+        if (event == null) return false
+        return gifPickerView?.shouldConsumeSearchKeyUp(event) == true
+    }
+
+    fun disableGifPickerSearchInputCapture() {
+        gifPickerView?.disableSearchInputCapture()
+    }
+
     private fun openSettings() {
         try {
             val intent = Intent(context, SettingsActivity::class.java).apply {
@@ -670,6 +690,29 @@ class StatusBarController(
             view.scrollToTop() // View was just added (happens when reopening after being removed)
         }
         lastSymPageRendered = 4
+    }
+
+    private fun updateGifPickerView(inputConnection: android.view.inputmethod.InputConnection? = null) {
+        val container = emojiKeyboardContainer ?: return
+        container.setPadding(0, 0, 0, emojiKeyboardBottomPaddingPx)
+
+        val view = gifPickerView ?: GifPickerView(
+            context = context,
+            gifClient = KlipyGifClient(context),
+            onGifSelected = { result -> onGifSelected?.invoke(result) }
+        ).also { gifPickerView = it }
+        val wasJustAdded = view.parent !== container
+        if (wasJustAdded) {
+            container.removeAllViews()
+            emojiKeyButtons.clear()
+            container.addView(view)
+        }
+        if (lastSymPageRendered != 5) {
+            view.refresh()
+        } else if (wasJustAdded) {
+            view.scrollToTop()
+        }
+        lastSymPageRendered = 5
     }
 
     /**
@@ -1662,6 +1705,8 @@ class StatusBarController(
             } else if (snapshot.symPage == 4) {
                 // Show emoji picker view
                 updateEmojiPickerView(inputConnection)
+            } else if (snapshot.symPage == 5) {
+                updateGifPickerView(inputConnection)
             } else if (symMappings != null) {
                 updateEmojiKeyboard(symMappings, snapshot.symPage, inputConnection)
             }

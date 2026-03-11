@@ -229,6 +229,7 @@ object PreferenceSchemas {
             "clipboard_retention_time" to PreferenceValueType.LONG,
             "emoji_shortcode_enabled" to PreferenceValueType.BOOLEAN,
             "symbol_shortcode_enabled" to PreferenceValueType.BOOLEAN,
+            "klipy_api_key" to PreferenceValueType.STRING,
             "trackpad_gestures_enabled" to PreferenceValueType.BOOLEAN,
             "trackpad_swipe_threshold" to PreferenceValueType.FLOAT,
             "pastierina_mode_override" to PreferenceValueType.STRING,

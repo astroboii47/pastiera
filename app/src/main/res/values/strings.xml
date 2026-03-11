@@ -39,6 +39,21 @@
     <string name="emoji_shortcodes_description">Type :smile: to insert 😊 while typing.</string>
     <string name="symbol_shortcodes_title">Symbol Shortcodes</string>
     <string name="symbol_shortcodes_description">Type :tm: for ™ or :copy: for ©.</string>
+    <string name="klipy_api_key_title">Klipy API Key</string>
+    <string name="klipy_api_key_missing_description">Required for the GIF SYM page. Stored locally on this device.</string>
+    <string name="klipy_api_key_configured_description">Configured for GIF search. Tap Edit to replace or clear it.</string>
+    <string name="klipy_api_key_edit">Edit</string>
+    <string name="klipy_api_key_dialog_description">Enter the Klipy API key used for GIF search. This value stays local to your device.</string>
+    <string name="klipy_api_key_field_label">API key</string>
+    <string name="gif_picker_search_placeholder">Search GIFs</string>
+    <string name="gif_picker_empty_prompt">Type to search Klipy GIFs.</string>
+    <string name="gif_picker_missing_api_key">Add your Klipy API key in Text Input settings to use GIF search.</string>
+    <string name="gif_picker_no_results">No GIFs found for that search.</string>
+    <string name="gif_picker_error">Unable to load GIF results right now.</string>
+    <string name="gif_picker_powered_by">Powered by KLIPY</string>
+    <string name="gif_picker_sent">GIF sent</string>
+    <string name="gif_picker_fallback_link_inserted">App does not accept GIFs from keyboards. Inserted link instead.</string>
+    <string name="gif_picker_link_copied">GIF link copied</string>
 
     <!-- Clear Alt on Space Section -->
     <string name="clear_alt_on_space_title">Clear Alt on Space</string>
@@ -189,6 +204,8 @@
     <string name="sym_enable_clipboard_page_description">Show the clipboard history when cycling.</string>
     <string name="sym_enable_emoji_picker_page_title">Enable Emoji Picker Page</string>
     <string name="sym_enable_emoji_picker_page_description">Show the full emoji picker when cycling.</string>
+    <string name="sym_enable_gif_picker_page_title">Enable GIF Page</string>
+    <string name="sym_enable_gif_picker_page_description">Show the Klipy GIF search page when cycling.</string>
     <string name="sym_swap_pages_title">Arrange SYM pages order</string>
     <string name="sym_swap_pages_description">Set the exact cycle order for all SYM pages by dragging each row.</string>
     <string name="sym_order_emoji_first">Emoji first</string>

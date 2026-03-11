@@ -5,6 +5,7 @@ import android.content.res.AssetManager
 import android.view.KeyEvent
 import android.widget.LinearLayout
 import android.view.inputmethod.InputConnection
+import it.palsoftware.pastiera.gif.KlipyGifResult
 
 /**
  * Coordinates the two StatusBarController instances (full input view vs
@@ -83,6 +84,13 @@ class CandidatesBarController(
             candidatesStatusBar.onMinimalUiToggleRequested = value
         }
 
+    var onGifSelected: ((KlipyGifResult) -> Unit)? = null
+        set(value) {
+            field = value
+            inputStatusBar.onGifSelected = value
+            candidatesStatusBar.onGifSelected = value
+        }
+
     fun getInputView(emojiMapText: String = ""): LinearLayout {
         return inputStatusBar.getOrCreateLayout(emojiMapText)
     }
@@ -113,6 +121,21 @@ class CandidatesBarController(
     fun disableEmojiPickerSearchInputCapture() {
         inputStatusBar.disableEmojiPickerSearchInputCapture()
         candidatesStatusBar.disableEmojiPickerSearchInputCapture()
+    }
+
+    fun handleGifPickerSearchKeyDown(event: KeyEvent?): Boolean {
+        return inputStatusBar.handleGifPickerSearchKeyDown(event) ||
+            candidatesStatusBar.handleGifPickerSearchKeyDown(event)
+    }
+
+    fun shouldConsumeGifPickerSearchKeyUp(event: KeyEvent?): Boolean {
+        return inputStatusBar.shouldConsumeGifPickerSearchKeyUp(event) ||
+            candidatesStatusBar.shouldConsumeGifPickerSearchKeyUp(event)
+    }
+
+    fun disableGifPickerSearchInputCapture() {
+        inputStatusBar.disableGifPickerSearchInputCapture()
+        candidatesStatusBar.disableGifPickerSearchInputCapture()
     }
 
     fun isMinimalUiActive(): Boolean = inputStatusBar.isMinimalUiActive()
