@@ -1,6 +1,5 @@
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/C0C31OHWF2)
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/astroboii47)
 # Pastiera Enhanced
 
 Pastiera Enhanced is a Titan 2-focused fork of [Pastiera](https://github.com/palsoftware/pastiera), based on upstream tag `nightly/v0.85-nightly.20260307.020619`.
@@ -18,6 +17,10 @@ It keeps Pastiera's physical-keyboard workflow and adds emoji shortcodes, a Klip
 - TypeQ25 reference and inspiration: [sriharshaKanukuntla/TypeQ25](https://github.com/sriharshaKanukuntla/TypeQ25)
 
 This fork's emoji shortcode feature was adapted with TypeQ25 as a reference, and the shortcode-related data/assets in this fork were added for that feature. The current clipboard flow uses Pastiera's built-in clipboard implementation rather than a retained TypeQ25 clipboard port.
+
+## Support
+- Support the original Pastiera project: [ko-fi.com/C0C31OHWF2](https://ko-fi.com/C0C31OHWF2)
+- Support this fork: [ko-fi.com/astroboii47](https://ko-fi.com/astroboii47)
 
 ## Klipy API key setup
 This fork does not ship a private Klipy API key. Each user should use their own key.
