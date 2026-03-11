@@ -38,6 +38,27 @@ class KlipyGifClient(
         throw lastFailure ?: IllegalStateException("Klipy search failed")
     }
 
+    fun trending(limit: Int = 24, page: Int = 1): List<KlipyGifResult> {
+        val apiKey = resolveApiKey()
+        if (apiKey.isBlank()) return emptyList()
+
+        val locale = Locale.getDefault().toLanguageTag().ifBlank { "en" }
+        val url = HttpUrl.Builder()
+            .scheme("https")
+            .host("api.klipy.com")
+            .addPathSegment("api")
+            .addPathSegment("v1")
+            .addPathSegment(apiKey)
+            .addPathSegment("gifs")
+            .addPathSegment("trending")
+            .addQueryParameter("per_page", limit.coerceIn(1, 48).toString())
+            .addQueryParameter("page", page.coerceAtLeast(1).toString())
+            .addQueryParameter("rating", "pg-13")
+            .addQueryParameter("locale", locale)
+            .build()
+        return executeSearch(url)
+    }
+
     private fun resolveApiKey(): String {
         val settingsKey = SettingsManager.getKlipyApiKey(context)
         return if (settingsKey.isNotBlank()) settingsKey else BuildConfig.KLIPY_API_KEY
@@ -54,6 +75,7 @@ class KlipyGifClient(
         val builder = HttpUrl.Builder()
             .scheme("https")
             .host("api.klipy.com")
+            .addPathSegment("api")
             .addPathSegment("v1")
             .addPathSegment(apiKey)
             .addPathSegment("gifs")
@@ -85,7 +107,9 @@ class KlipyGifClient(
         if (body.isBlank()) return emptyList()
 
         val root = JSONObject(body)
-        val items = root.optJSONArray("data")
+        val nestedData = root.optJSONObject("data")
+        val items = nestedData?.optJSONArray("data")
+            ?: root.optJSONArray("data")
             ?: root.optJSONArray("results")
             ?: root.optJSONArray("gifs")
             ?: JSONArray()
@@ -101,15 +125,19 @@ class KlipyGifClient(
     private fun parseResult(item: JSONObject): KlipyGifResult? {
         val mediaFormats = item.optJSONObject("media_formats")
         val images = item.optJSONObject("images")
+        val file = item.optJSONObject("file")
 
         val gifUrl = firstNonBlank(
             extractFormatUrl(mediaFormats, listOf("gif", "mediumgif", "tinygif", "nanogif")),
-            extractImageUrl(images, listOf("original", "fixed_width", "downsized"))
+            extractImageUrl(images, listOf("original", "fixed_width", "downsized")),
+            extractFileUrl(file, listOf("sm", "md", "hd", "xs"), "gif")
         ) ?: return null
 
         val previewUrl = firstNonBlank(
             extractFormatUrl(mediaFormats, listOf("tinygifpreview", "nanogifpreview", "gifpreview", "tinygif", "nanogif")),
             extractImageUrl(images, listOf("preview_gif", "fixed_width_still", "downsized_still", "original_still")),
+            extractFileUrl(file, listOf("sm", "xs", "md", "hd"), "jpg"),
+            extractFileUrl(file, listOf("sm", "xs", "md", "hd"), "webp"),
             gifUrl
         ) ?: return null
 
@@ -151,6 +179,18 @@ class KlipyGifClient(
         images ?: return null
         names.forEach { imageName ->
             val candidate = images.optJSONObject(imageName)?.optString("url")
+            if (!candidate.isNullOrBlank()) {
+                return candidate
+            }
+        }
+        return null
+    }
+
+    private fun extractFileUrl(file: JSONObject?, sizeNames: List<String>, formatName: String): String? {
+        file ?: return null
+        sizeNames.forEach { sizeName ->
+            val sizeObject = file.optJSONObject(sizeName) ?: return@forEach
+            val candidate = sizeObject.optJSONObject(formatName)?.optString("url")
             if (!candidate.isNullOrBlank()) {
                 return candidate
             }

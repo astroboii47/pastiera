@@ -164,8 +164,7 @@ class GifPickerView(
             return
         }
         if (searchQuery.isBlank()) {
-            resultAdapter.submitList(emptyList())
-            showMessage(context.getString(R.string.gif_picker_empty_prompt))
+            applyTrending()
             return
         }
         applySearchNow()
@@ -244,8 +243,7 @@ class GifPickerView(
 
     private fun applySearchNow() {
         if (searchQuery.isBlank()) {
-            resultAdapter.submitList(emptyList())
-            showMessage(context.getString(R.string.gif_picker_empty_prompt))
+            applyTrending()
             return
         }
 
@@ -263,6 +261,37 @@ class GifPickerView(
                 if (results.isEmpty()) {
                     resultAdapter.submitList(emptyList())
                     showMessage(context.getString(R.string.gif_picker_no_results))
+                } else {
+                    emptyView.visibility = View.GONE
+                    recyclerView.visibility = View.VISIBLE
+                    resultAdapter.submitList(results)
+                    scrollToTop()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                loadingView.visibility = View.GONE
+                resultAdapter.submitList(emptyList())
+                showMessage(context.getString(R.string.gif_picker_error))
+            }
+        }
+    }
+
+    private fun applyTrending() {
+        loadingView.visibility = View.VISIBLE
+        emptyView.visibility = View.GONE
+        recyclerView.visibility = View.VISIBLE
+
+        searchJob?.cancel()
+        searchJob = coroutineScope.launch {
+            try {
+                val results = withContext(Dispatchers.IO) {
+                    gifClient.trending()
+                }
+                loadingView.visibility = View.GONE
+                if (results.isEmpty()) {
+                    resultAdapter.submitList(emptyList())
+                    showMessage(context.getString(R.string.gif_picker_empty_prompt))
                 } else {
                     emptyView.visibility = View.GONE
                     recyclerView.visibility = View.VISIBLE
