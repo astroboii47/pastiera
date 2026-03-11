@@ -33,6 +33,7 @@ import it.palsoftware.pastiera.SettingsManager
 import it.palsoftware.pastiera.inputmethod.StatusBarController
 import it.palsoftware.pastiera.inputmethod.TextSelectionHelper
 import it.palsoftware.pastiera.inputmethod.NotificationHelper
+import it.palsoftware.pastiera.inputmethod.suggestions.SuggestionButtonHandler
 import it.palsoftware.pastiera.inputmethod.VariationButtonHandler
 import it.palsoftware.pastiera.inputmethod.SpeechRecognitionActivity
 import it.palsoftware.pastiera.data.variation.VariationRepository
@@ -58,6 +59,13 @@ class VariationBarView(
     private val imeServiceClass: Class<*>? = null,
     private val buttonRegistry: StatusBarButtonRegistry? = null
 ) {
+    private enum class CenterContentMode {
+        VARIATIONS,
+        SUGGESTIONS,
+        STATIC,
+        EMPTY
+    }
+
     companion object {
         private const val TAG = "VariationBarView"
         private const val SWIPE_HINT_SHOW_DELAY_MS = 1000L
@@ -119,7 +127,7 @@ class VariationBarView(
     private var staticVariationsAlt: List<String> = emptyList()
     private var emailVariations: List<String> = emptyList()
     private var lastInputConnectionUsed: android.view.inputmethod.InputConnection? = null
-    private var lastIsStaticContent: Boolean? = null
+    private var lastCenterContentMode: CenterContentMode? = null
     private var pressedView: View? = null
     private var longPressHandler: Handler? = null
     private var longPressRunnable: Runnable? = null
@@ -238,7 +246,7 @@ class VariationBarView(
     fun resetVariationsState() {
         lastDisplayedVariations = emptyList()
         lastInputConnectionUsed = null
-        lastIsStaticContent = null
+        lastCenterContentMode = null
     }
 
     fun hideImmediate() {
@@ -309,16 +317,23 @@ class VariationBarView(
         val allowStaticFallback = staticModeEnabled || snapshot.shouldDisableVariations
 
         val effectiveVariations: List<String>
-        val isStaticContent: Boolean
+        val centerContentMode: CenterContentMode
         // Legacy behavior: give priority to letter variations when available, otherwise suggestions.
         when {
             useDynamicVariations -> {
                 effectiveVariations = snapshot.variations
-                isStaticContent = false
+                centerContentMode = CenterContentMode.VARIATIONS
             }
             hasSuggestions -> {
-                effectiveVariations = snapshot.suggestions
-                isStaticContent = false
+                val s0 = snapshot.suggestions.getOrNull(0)
+                val s1 = snapshot.suggestions.getOrNull(1)
+                val s2 = snapshot.suggestions.getOrNull(2)
+                effectiveVariations = listOfNotNull(
+                    if (snapshot.suggestions.size >= 3) s2 else null,
+                    s0,
+                    if (snapshot.suggestions.size >= 2) s1 else null
+                )
+                centerContentMode = CenterContentMode.SUGGESTIONS
             }
             allowStaticFallback -> {
                 val variations = if (snapshot.isEmailField) {
@@ -358,12 +373,12 @@ class VariationBarView(
                     staticVariations
                 }
                 effectiveVariations = variations
-                isStaticContent = true
+                centerContentMode = CenterContentMode.STATIC
             }
             else -> {
                 // Keep the bar visible (mic/settings) but show empty placeholders in the variation row.
                 effectiveVariations = emptyList()
-                isStaticContent = false
+                centerContentMode = CenterContentMode.EMPTY
             }
         }
 
@@ -378,7 +393,7 @@ class VariationBarView(
 
         val variationsChanged = limitedVariations != lastDisplayedVariations
         val inputConnectionChanged = lastInputConnectionUsed !== inputConnection
-        val contentModeChanged = lastIsStaticContent != isStaticContent
+        val contentModeChanged = lastCenterContentMode != centerContentMode
         val hasExistingRow = currentVariationsRow != null &&
             currentVariationsRow?.parent == containerView &&
             currentVariationsRow?.visibility == View.VISIBLE
@@ -486,7 +501,7 @@ class VariationBarView(
 
         lastDisplayedVariations = limitedVariations
         lastInputConnectionUsed = inputConnection
-        lastIsStaticContent = isStaticContent
+        lastCenterContentMode = centerContentMode
         
         // Create a single callbacks object with all available callbacks.
         // Each button factory will extract only the callbacks it needs.
@@ -546,10 +561,11 @@ class VariationBarView(
                 buttonWidth,
                 variationButtonHeight,
                 maxButtonWidth,
-                isStaticContent,
+                centerContentMode,
                 isAddCandidate,
                 isLast,
-                spacingBetweenButtons
+                spacingBetweenButtons,
+                snapshot.shouldDisableSuggestions
             )
             variationButtons.add(button)
             variationsRow.addView(button)
@@ -934,10 +950,11 @@ class VariationBarView(
         buttonWidth: Int,
         buttonHeight: Int,
         maxButtonWidth: Int,
-        isStatic: Boolean,
+        centerContentMode: CenterContentMode,
         isAddCandidate: Boolean,
         isLast: Boolean,
-        spacingBetweenButtons: Int
+        spacingBetweenButtons: Int,
+        shouldDisableSuggestions: Boolean
     ): TextView {
         val dp4 = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
@@ -988,7 +1005,14 @@ class VariationBarView(
                     View.OnClickListener {
                         onAddUserWord?.invoke(variation)
                     }
-                } else if (isStatic) {
+                } else if (centerContentMode == CenterContentMode.SUGGESTIONS) {
+                    SuggestionButtonHandler.createSuggestionClickListener(
+                        variation,
+                        inputConnection,
+                        onVariationSelectedListener,
+                        shouldDisableSuggestions
+                    )
+                } else if (centerContentMode == CenterContentMode.STATIC) {
                     VariationButtonHandler.createStaticVariationClickListener(
                         variation,
                         inputConnection,
@@ -1005,6 +1029,22 @@ class VariationBarView(
                 }
             )
         }
+    }
+
+    fun flashSuggestionAtIndex(suggestionIndex: Int) {
+        val slotIndex = when (suggestionIndex) {
+            0 -> 1
+            1 -> 2
+            2 -> 0
+            else -> return
+        }
+        val button = variationButtons.getOrNull(slotIndex) ?: return
+        button.isPressed = true
+        button.refreshDrawableState()
+        button.postDelayed({
+            button.isPressed = false
+            button.refreshDrawableState()
+        }, 160L)
     }
 
     private fun createPlaceholderButton(buttonWidth: Int, buttonHeight: Int): View {

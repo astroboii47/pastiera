@@ -1,9 +1,12 @@
 package it.palsoftware.pastiera.inputmethod.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.ImageDecoder
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
@@ -13,6 +16,8 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.graphics.drawable.Animatable
+import android.graphics.drawable.Drawable
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -33,10 +38,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import android.widget.Toast
+import java.nio.ByteBuffer
 
 class GifPickerView(
     context: Context,
@@ -49,8 +57,16 @@ class GifPickerView(
     private val loadingView: ProgressBar
     private val emptyView: TextView
     private val attributionView: TextView
-    private val resultAdapter = GifResultAdapter(onGifSelected)
-    private val fixedHeight = dpToPx(177f)
+    private val previewOverlay: FrameLayout
+    private val previewImageView: ImageView
+    private val previewTitleView: TextView
+    private val sendButton: TextView
+    private val cancelButton: TextView
+    private val resultAdapter = GifResultAdapter(
+        onGifTapped = { showPreview(it) },
+        onGifLongPressed = { copyGifLink(it) }
+    )
+    private val fixedHeight = dpToPx(312f)
     private val smallPadding = dpToPx(8f)
     private val previewSpacing = dpToPx(8f)
     private val columns = 3
@@ -58,6 +74,7 @@ class GifPickerView(
     private var searchQuery = ""
     private var searchInputCaptureEnabled = true
     private var coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var selectedGif: KlipyGifResult? = null
 
     init {
         setBackgroundColor(Color.TRANSPARENT)
@@ -154,20 +171,88 @@ class GifPickerView(
         addView(vertical)
         addView(loadingView)
         addView(emptyView)
+        previewOverlay = FrameLayout(context).apply {
+            setBackgroundColor(Color.argb(232, 16, 16, 16))
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+            visibility = View.GONE
+        }
+        val previewContent = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+            setPadding(dpToPx(12f), dpToPx(12f), dpToPx(12f), dpToPx(12f))
+        }
+        previewImageView = ImageView(context).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+            setBackgroundColor(Color.argb(35, 255, 255, 255))
+        }
+        previewTitleView = TextView(context).apply {
+            setTextColor(Color.WHITE)
+            textSize = 13f
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(10f)
+            }
+        }
+        val buttonRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(12f)
+            }
+        }
+        cancelButton = buildPreviewButton(context.getString(R.string.gif_picker_preview_cancel)).apply {
+            setOnClickListener { hidePreview() }
+        }
+        sendButton = buildPreviewButton(context.getString(R.string.gif_picker_preview_send)).apply {
+            setOnClickListener {
+                selectedGif?.let(onGifSelected)
+                hidePreview()
+            }
+        }
+        buttonRow.addView(cancelButton)
+        buttonRow.addView(sendButton)
+        previewContent.addView(previewImageView)
+        previewContent.addView(previewTitleView)
+        previewContent.addView(buttonRow)
+        previewOverlay.addView(previewContent)
+        addView(previewOverlay)
 
         refresh()
     }
 
     fun refresh() {
+        ensureActiveScope()
         if (!gifClient.hasConfiguredApiKey()) {
             showMessage(context.getString(R.string.gif_picker_missing_api_key))
             return
         }
+        searchJob?.cancel()
         if (searchQuery.isBlank()) {
             applyTrending()
             return
         }
         applySearchNow()
+    }
+
+    fun resetToTrending() {
+        ensureActiveScope()
+        searchJob?.cancel()
+        searchQuery = ""
+        searchField.setText("")
+        showMessage(context.getString(R.string.gif_picker_empty_prompt))
+        applyTrending()
     }
 
     fun handleSearchKeyDown(event: KeyEvent): Boolean {
@@ -224,7 +309,52 @@ class GifPickerView(
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        searchJob?.cancel()
         coroutineScope.cancel()
+    }
+
+    private fun showPreview(item: KlipyGifResult) {
+        selectedGif = item
+        previewTitleView.text = item.title
+        GifPreviewLoader.loadInto(previewImageView, item.gifUrl)
+        previewOverlay.visibility = View.VISIBLE
+    }
+
+    private fun hidePreview() {
+        selectedGif = null
+        previewOverlay.visibility = View.GONE
+    }
+
+    private fun copyGifLink(item: KlipyGifResult) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val fallbackLink = item.shareUrl.ifBlank { item.gifUrl }
+        clipboard.setPrimaryClip(ClipData.newPlainText("GIF link", fallbackLink))
+        Toast.makeText(context, context.getString(R.string.gif_picker_link_copied), Toast.LENGTH_SHORT).show()
+    }
+
+    private fun buildPreviewButton(label: String): TextView {
+        return TextView(context).apply {
+            text = label
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            textSize = 13f
+            setBackgroundColor(Color.argb(38, 255, 255, 255))
+            setPadding(dpToPx(18f), dpToPx(10f), dpToPx(18f), dpToPx(10f))
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+            ).apply {
+                marginStart = dpToPx(4f)
+                marginEnd = dpToPx(4f)
+            }
+        }
+    }
+
+    private fun ensureActiveScope() {
+        if (!coroutineScope.isActive) {
+            coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        }
     }
 
     private fun scheduleSearch() {
@@ -268,6 +398,7 @@ class GifPickerView(
                     scrollToTop()
                 }
             } catch (e: CancellationException) {
+                loadingView.visibility = View.GONE
                 throw e
             } catch (_: Exception) {
                 loadingView.visibility = View.GONE
@@ -299,6 +430,7 @@ class GifPickerView(
                     scrollToTop()
                 }
             } catch (e: CancellationException) {
+                loadingView.visibility = View.GONE
                 throw e
             } catch (_: Exception) {
                 loadingView.visibility = View.GONE
@@ -325,7 +457,8 @@ class GifPickerView(
 }
 
 private class GifResultAdapter(
-    private val onGifSelected: (KlipyGifResult) -> Unit
+    private val onGifTapped: (KlipyGifResult) -> Unit,
+    private val onGifLongPressed: (KlipyGifResult) -> Unit
 ) : ListAdapter<KlipyGifResult, GifResultViewHolder>(GifResultDiffCallback) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): GifResultViewHolder {
@@ -361,7 +494,7 @@ private class GifResultAdapter(
         }
         container.addView(preview)
         container.addView(title)
-        return GifResultViewHolder(container, preview, title, onGifSelected)
+        return GifResultViewHolder(container, preview, title, onGifTapped, onGifLongPressed)
     }
 
     override fun onBindViewHolder(holder: GifResultViewHolder, position: Int) {
@@ -373,11 +506,16 @@ private class GifResultViewHolder(
     itemView: View,
     private val previewView: ImageView,
     private val titleView: TextView,
-    private val onGifSelected: (KlipyGifResult) -> Unit
+    private val onGifTapped: (KlipyGifResult) -> Unit,
+    private val onGifLongPressed: (KlipyGifResult) -> Unit
 ) : RecyclerView.ViewHolder(itemView) {
     fun bind(item: KlipyGifResult) {
         titleView.text = item.title
-        itemView.setOnClickListener { onGifSelected(item) }
+        itemView.setOnClickListener { onGifTapped(item) }
+        itemView.setOnLongClickListener {
+            onGifLongPressed(item)
+            true
+        }
         GifPreviewLoader.loadInto(previewView, item.previewUrl)
     }
 }
@@ -392,30 +530,63 @@ private object GifPreviewLoader {
     private val bitmapCache = object : LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 1024L / 16L).toInt()) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
     }
+    private val byteCache = object : LruCache<String, ByteArray>(8 * 1024) {
+        override fun sizeOf(key: String, value: ByteArray): Int = value.size / 1024
+    }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     fun loadInto(imageView: ImageView, url: String) {
         imageView.tag = url
-        bitmapCache.get(url)?.let {
-            imageView.setImageBitmap(it)
+        (imageView.drawable as? Animatable)?.stop()
+        byteCache.get(url)?.let { bytes ->
+            setDecodedPreview(imageView, url, bytes)
+            return
+        }
+        bitmapCache.get(url)?.let { bitmap ->
+            imageView.setImageBitmap(bitmap)
             return
         }
         imageView.setImageDrawable(null)
         scope.launch {
-            val bitmap = withContext(Dispatchers.IO) { downloadBitmap(url) }
-            if (imageView.tag == url && bitmap != null) {
-                bitmapCache.put(url, bitmap)
-                imageView.setImageBitmap(bitmap)
+            val bytes = withContext(Dispatchers.IO) { downloadBytes(url) }
+            if (imageView.tag == url && bytes != null) {
+                byteCache.put(url, bytes)
+                setDecodedPreview(imageView, url, bytes)
             }
         }
     }
 
-    private fun downloadBitmap(url: String): Bitmap? {
+    private fun downloadBytes(url: String): ByteArray? {
         val request = Request.Builder().url(url).build()
         okHttpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return null
-            val bytes = response.body?.bytes() ?: return null
-            return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            return response.body?.bytes()
+        }
+    }
+
+    private fun setDecodedPreview(imageView: ImageView, url: String, bytes: ByteArray) {
+        val drawable = decodeDrawable(bytes)
+        if (drawable != null) {
+            if (imageView.tag == url) {
+                imageView.setImageDrawable(drawable)
+                (drawable as? Animatable)?.start()
+            }
+            return
+        }
+
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return
+        bitmapCache.put(url, bitmap)
+        if (imageView.tag == url) {
+            imageView.setImageBitmap(bitmap)
+        }
+    }
+
+    private fun decodeDrawable(bytes: ByteArray): Drawable? {
+        return try {
+            val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes))
+            ImageDecoder.decodeDrawable(source)
+        } catch (_: Exception) {
+            null
         }
     }
 }

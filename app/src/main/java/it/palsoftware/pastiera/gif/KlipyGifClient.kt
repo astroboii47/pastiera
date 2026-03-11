@@ -136,8 +136,9 @@ class KlipyGifClient(
         val previewUrl = firstNonBlank(
             extractFormatUrl(mediaFormats, listOf("tinygifpreview", "nanogifpreview", "gifpreview", "tinygif", "nanogif")),
             extractImageUrl(images, listOf("preview_gif", "fixed_width_still", "downsized_still", "original_still")),
-            extractFileUrl(file, listOf("sm", "xs", "md", "hd"), "jpg"),
+            extractFileUrl(file, listOf("sm", "xs", "md", "hd"), "gif"),
             extractFileUrl(file, listOf("sm", "xs", "md", "hd"), "webp"),
+            extractFileUrl(file, listOf("sm", "xs", "md", "hd"), "jpg"),
             gifUrl
         ) ?: return null
 

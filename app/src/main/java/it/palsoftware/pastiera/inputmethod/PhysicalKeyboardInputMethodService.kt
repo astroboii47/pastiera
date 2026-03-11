@@ -175,6 +175,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     
     // Constants
     private val DOUBLE_TAP_THRESHOLD = 500L
+    private val SYM_TOGGLE_DEBOUNCE_MS = 300L
     private val CURSOR_UPDATE_DELAY = 50L
     private val MULTI_TAP_TIMEOUT_MS = 400L
 
@@ -211,6 +212,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     private var altLayerLatched: Boolean = false
     private var lastShiftTapUpTime: Long = 0L
     private var lastAltTapUpTime: Long = 0L
+    private var lastSymToggleTime: Long = 0L
     private var symTogglePendingOnKeyUp: Boolean = false
     private var symChordUsedSinceKeyDown: Boolean = false
 
@@ -2699,8 +2701,12 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         // Toggle SYM layout on key release only when SYM was tapped alone.
         if (keyCode == KEYCODE_SYM) {
             if (symTogglePendingOnKeyUp && !symChordUsedSinceKeyDown) {
-                symLayoutController.toggleSymPage()
-                updateStatusBarText()
+                val eventTime = event?.eventTime ?: System.currentTimeMillis()
+                if (eventTime - lastSymToggleTime >= SYM_TOGGLE_DEBOUNCE_MS) {
+                    symLayoutController.toggleSymPage()
+                    lastSymToggleTime = eventTime
+                    updateStatusBarText()
+                }
             }
             symTogglePendingOnKeyUp = false
             symChordUsedSinceKeyDown = false

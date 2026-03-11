@@ -183,6 +183,7 @@ class StatusBarController(
      * ordering (0=center, 1=right, 2=left). Used for trackpad/swipe commits.
      */
     fun flashSuggestionSlot(suggestionIndex: Int) {
+        variationBarView?.flashSuggestionAtIndex(suggestionIndex)
         fullSuggestionsBar?.flashSuggestionAtIndex(suggestionIndex)
     }
 
@@ -707,10 +708,10 @@ class StatusBarController(
             emojiKeyButtons.clear()
             container.addView(view)
         }
-        if (lastSymPageRendered != 5) {
+        if (wasJustAdded) {
+            view.resetToTrending()
+        } else if (lastSymPageRendered != 5) {
             view.refresh()
-        } else if (wasJustAdded) {
-            view.scrollToTop()
         }
         lastSymPageRendered = 5
     }
@@ -1630,8 +1631,10 @@ class StatusBarController(
         val variationsWrapperView = if (!forceMinimalUi) variationsWrapper else null
         val experimentalEnabled = SettingsManager.isExperimentalSuggestionsEnabled(context)
         val suggestionsEnabledSetting = SettingsManager.getSuggestionsEnabled(context)
-        // Show full suggestions bar when conditions are met (including minimal UI mode)
+        // In full UI, suggestions reuse the variations row. Keep the dedicated full bar
+        // only for forced minimal UI where the variations row is hidden.
         val showFullBar =
+            forceMinimalUi &&
             experimentalEnabled &&
             suggestionsEnabledSetting &&
             !snapshot.shouldDisableSuggestions &&
@@ -1754,10 +1757,7 @@ class StatusBarController(
                     isEnabled = true
                     isClickable = true
                 }
-                val snapshotForVariations = if (snapshot.suggestions.isNotEmpty()) {
-                    snapshot.copy(suggestions = emptyList(), addWordCandidate = null)
-                } else snapshot
-                variationsBar?.showVariations(snapshotForVariations, inputConnection)
+                variationsBar?.showVariations(snapshot, inputConnection)
             }
             symShown = false
             wasSymActive = false
@@ -1769,10 +1769,7 @@ class StatusBarController(
                 isEnabled = true
                 isClickable = true
             }
-            val snapshotForVariations = if (snapshot.suggestions.isNotEmpty()) {
-                snapshot.copy(suggestions = emptyList(), addWordCandidate = null)
-            } else snapshot
-            variationsBar?.showVariations(snapshotForVariations, inputConnection)
+            variationsBar?.showVariations(snapshot, inputConnection)
             symShown = false
             wasSymActive = false
             lastSymPageRendered = 0 // Reset when closing SYM page

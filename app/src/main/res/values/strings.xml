@@ -54,6 +54,8 @@
     <string name="gif_picker_sent">GIF sent</string>
     <string name="gif_picker_fallback_link_inserted">App does not accept GIFs from keyboards. Inserted link instead.</string>
     <string name="gif_picker_link_copied">GIF link copied</string>
+    <string name="gif_picker_preview_send">Send GIF</string>
+    <string name="gif_picker_preview_cancel">Cancel</string>
 
     <!-- Clear Alt on Space Section -->
     <string name="clear_alt_on_space_title">Clear Alt on Space</string>
