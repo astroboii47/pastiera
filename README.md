@@ -107,7 +107,3 @@ Notes:
 
 ## Releases
 - Publish APKs through GitHub Releases on this fork.
-- Recommended release title:
-  - `Pastiera Enhanced for Titan 2`
-- Recommended APK naming:
-  - `Pastiera Enhanced Titan 2 v0.85.apk`
