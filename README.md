@@ -1,5 +1,6 @@
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/C0C31OHWF2)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/astroboii47)
 # Pastiera Enhanced
 
 Pastiera Enhanced is a Titan 2-focused fork of [Pastiera](https://github.com/palsoftware/pastiera), based on upstream tag `nightly/v0.85-nightly.20260307.020619`.
