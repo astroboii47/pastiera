@@ -19,11 +19,11 @@ This fork's emoji shortcode feature was adapted with TypeQ25 as a reference, and
 
 ## Download / Release naming
 - Recommended APK asset name:
-  - `Pastiera-Titan2-Klipy-v0.85-nightly.20260307.020619.apk`
+  - `Pastiera Enhanced Titan 2 v0.85.apk`
 - Shorter alternative:
-  - `Pastiera-Titan2-Mod-v0.85.apk`
+  - `Pastiera Enhanced v0.85.apk`
 - If you publish multiple iterations from the same upstream nightly, append a fork revision:
-  - `Pastiera-Titan2-Klipy-v0.85-nightly.20260307.020619-r2.apk`
+  - `Pastiera Enhanced Titan 2 v0.85-r2.apk`
 
 ## Klipy API key setup
 This fork does not ship a private Klipy API key. Each user should use their own key.
