@@ -11,6 +11,12 @@ Input method for physical keyboards android devices (e.g. Unihertz Titan 2), des
 - Merges typing suggestions into the existing variations row instead of stacking a separate suggestions row, while keeping the left and right status buttons visible.
 - Tuned for Unihertz Titan 2 usage.
 
+## Credits
+- Upstream base project: [palsoftware/pastiera](https://github.com/palsoftware/pastiera)
+- TypeQ25 reference and inspiration: [sriharshaKanukuntla/TypeQ25](https://github.com/sriharshaKanukuntla/TypeQ25)
+
+This fork's emoji shortcode feature was adapted with TypeQ25 as a reference, and the shortcode-related data/assets in this fork were added for that feature. The current clipboard flow uses Pastiera's built-in clipboard implementation rather than a retained TypeQ25 clipboard port.
+
 ## Download / Release naming
 - Recommended APK asset name:
   - `Pastiera-Titan2-Klipy-v0.85-nightly.20260307.020619.apk`
