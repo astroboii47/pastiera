@@ -90,10 +90,11 @@ Notes:
 - Android autobackup function.
 
 ## Installation
-1. Build the APK or install an existing build.
-2. Android Settings → System → Languages & input → Virtual keyboard → Manage keyboards.
-3. Enable “Pastiera” and select it from the input selector when typing.
-4. If you want GIF search, add your own Klipy API key in `Settings -> Text Input`.
+1. Download the APK from this fork's [GitHub Releases](https://github.com/astroboii47/pastiera/releases).
+2. Install the APK on your device.
+3. Android Settings → System → Languages & input → Virtual keyboard → Manage keyboards.
+4. Enable “Pastiera” and select it from the input selector when typing.
+5. If you want GIF search, add your own Klipy API key in `Settings -> Text Input`.
 
 ## Requirements
 - Android 10 (API 29) or higher.
