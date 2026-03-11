@@ -4,6 +4,37 @@
 
 Input method for physical keyboards android devices (e.g. Unihertz Titan 2), designed to make typing faster through shortcuts, gestures, and customization.
 
+## This fork
+- Based on upstream tag `nightly/v0.85-nightly.20260307.020619`.
+- Adds emoji shortcodes with inline suggestions.
+- Adds a Klipy-powered GIF SYM page with trending/search, animated previews, tap-to-preview before send, rich GIF send when supported, and link fallback when not.
+- Merges typing suggestions into the existing variations row instead of stacking a separate suggestions row, while keeping the left and right status buttons visible.
+- Tuned for Unihertz Titan 2 usage.
+
+## Download / Release naming
+- Recommended APK asset name:
+  - `Pastiera-Titan2-Klipy-v0.85-nightly.20260307.020619.apk`
+- Shorter alternative:
+  - `Pastiera-Titan2-Mod-v0.85.apk`
+- If you publish multiple iterations from the same upstream nightly, append a fork revision:
+  - `Pastiera-Titan2-Klipy-v0.85-nightly.20260307.020619-r2.apk`
+
+## Klipy API key setup
+This fork does not ship a private Klipy API key. Each user should use their own key.
+
+1. Create a Klipy developer account and generate a test API key at [klipy.com/docs](https://klipy.com/docs).
+2. Install the APK.
+3. Open `Pastiera Settings` -> `Text Input`.
+4. Find the Klipy GIF API key setting.
+5. Paste your API key there.
+6. Enable the GIF SYM page if it is not already enabled.
+7. Open the GIF page from SYM and test trending/search.
+
+Notes:
+- Klipy test keys are rate-limited, but they are usable for personal testing and normal keyboard use.
+- Real GIF send works only in apps that accept rich content from keyboards.
+- Unsupported apps fall back to inserting or copying a GIF link.
+
 ## Quick overview
 - Compact status bar with LED indicators for Shift/SYM/Ctrl/Alt, variants/suggestions bar, and swipe-pad gestures to move the cursor.
 - Multiple layouts (QWERTY/AZERTY/QWERTZ, Greek, Cyrillic, Arabic, translit, etc.) fully configurable; JSON import/export directly from the app. A web frontend for editing layouts is available at https://pastierakeyedit.vercel.app/
@@ -66,6 +97,7 @@ Input method for physical keyboards android devices (e.g. Unihertz Titan 2), des
 1. Build the APK or install an existing build.
 2. Android Settings → System → Languages & input → Virtual keyboard → Manage keyboards.
 3. Enable “Pastiera” and select it from the input selector when typing.
+4. If you want GIF search, add your own Klipy API key in `Settings -> Text Input`.
 
 ## Requirements
 - Android 10 (API 29) or higher.
