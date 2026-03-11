@@ -1,11 +1,12 @@
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/C0C31OHWF2)
-# Pastiera
+# Pastiera Enhanced
 
-Input method for physical keyboards android devices (e.g. Unihertz Titan 2), designed to make typing faster through shortcuts, gestures, and customization.
+Pastiera Enhanced is a Titan 2-focused fork of [Pastiera](https://github.com/palsoftware/pastiera), based on upstream tag `nightly/v0.85-nightly.20260307.020619`.
+
+It keeps Pastiera's physical-keyboard workflow and adds emoji shortcodes, a Klipy GIF page, and a cleaner shared row for suggestions and variations.
 
 ## This fork
-- Based on upstream tag `nightly/v0.85-nightly.20260307.020619`.
 - Adds emoji shortcodes with inline suggestions.
 - Adds a Klipy-powered GIF SYM page with trending/search, animated previews, tap-to-preview before send, rich GIF send when supported, and link fallback when not.
 - Merges typing suggestions into the existing variations row instead of stacking a separate suggestions row, while keeping the left and right status buttons visible.
@@ -38,7 +39,7 @@ Notes:
 - Multiple layouts (QWERTY/AZERTY/QWERTZ, Greek, Cyrillic, Arabic, translit, etc.) fully configurable; JSON import/export directly from the app. A web frontend for editing layouts is available at https://pastierakeyedit.vercel.app/
 - SYM pages usable via touch or physical keys (emoji + symbols), reorderable/disableable, with an integrated layout editor.
 - Clipboard support with multiple entries and pinnable items.
-- Support for dictionary based suggestions/Autocorrections + swipe gestures to accept a suggestion (requires Shizuku)
+- Support for dictionary based suggestions/autocorrections plus swipe gestures to accept a suggestion (requires Shizuku).
 - Full backup/restore (settings, layouts, variations, dictionaries), UI translated into multiple languages, and built-in GitHub update checks.
 
 ## Typing and modifiers
@@ -69,19 +70,16 @@ Notes:
 - Dedicated variations editor to replace/add variants via JSON or Unicode picker; optional static bar.
 
 ## Suggestions and autocorrection
-
-- Experimental support for dictionary based autocorrection/suggestions
+- Experimental support for dictionary based autocorrection/suggestions.
 - User dictionary with search and edit abilities.
-- Per-language auto substituion editor, quick search, and a global “Pastiera Recipes” set shared across all languages.
-- Change language/keymap with a tap on the language code button or ctrl+space
-
-
+- Per-language auto substitution editor, quick search, and a global “Pastiera Recipes” set shared across all languages.
+- Change language/keymap with a tap on the language code button or `Ctrl+Space`.
 
 ## Comfort and extra input
-- Double space → period + space + uppercase; 
+- Double space -> period + space + uppercase.
 - Swipe left on the keyboard to delete a word (Titan 2).
 - Optional Alt+Ctrl shortcut to start Google Voice Typing; microphone always available on the variants bar.
-- Compact status bar to minimize vertical space. With on-screen keyboard disabled from the IME selector, it uses even less space (aka Pastierina mode)
+- Compact status bar to minimize vertical space. With on-screen keyboard disabled from the IME selector, it uses even less space (aka Pastierina mode).
 - Translated UI (it/en/de/es/fr/pl/ru/hy) and onboarding tutorial.
 
 ## Backup, updates, and data
@@ -89,7 +87,7 @@ Notes:
 - Restore merges saved variations with defaults to avoid losing newly added keys.
 - Built-in GitHub update check when opening settings (with option to ignore a release).
 - Customizable files in `files/`: `variations.json`, `ctrl_key_mappings.json`, `sym_key_mappings*.json`, `keyboard_layouts/*.json`, user dictionaries.
-- Android autobackup function 
+- Android autobackup function.
 
 ## Installation
 1. Build the APK or install an existing build.
