@@ -17,14 +17,6 @@ Input method for physical keyboards android devices (e.g. Unihertz Titan 2), des
 
 This fork's emoji shortcode feature was adapted with TypeQ25 as a reference, and the shortcode-related data/assets in this fork were added for that feature. The current clipboard flow uses Pastiera's built-in clipboard implementation rather than a retained TypeQ25 clipboard port.
 
-## Download / Release naming
-- Recommended APK asset name:
-  - `Pastiera Enhanced Titan 2 v0.85.apk`
-- Shorter alternative:
-  - `Pastiera Enhanced v0.85.apk`
-- If you publish multiple iterations from the same upstream nightly, append a fork revision:
-  - `Pastiera Enhanced Titan 2 v0.85-r2.apk`
-
 ## Klipy API key setup
 This fork does not ship a private Klipy API key. Each user should use their own key.
 
