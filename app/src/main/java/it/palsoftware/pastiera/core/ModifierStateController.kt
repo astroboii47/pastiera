@@ -22,27 +22,51 @@ class ModifierStateController(
     private var lastKeyWasModifier = false
     private var lastModifierKeyCode: Int = 0
 
+    private fun normalizeModifierTapKeyCode(keyCode: Int): Int {
+        return when (keyCode) {
+            KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT -> KeyEvent.KEYCODE_SHIFT_LEFT
+            KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT -> KeyEvent.KEYCODE_CTRL_LEFT
+            KeyEvent.KEYCODE_ALT_LEFT, KeyEvent.KEYCODE_ALT_RIGHT -> KeyEvent.KEYCODE_ALT_LEFT
+            else -> keyCode
+        }
+    }
+
     private class ShiftStateMachine(
         private val doubleTapThreshold: Long
     ) {
         var state: ShiftState = ShiftState.OFF
             private set
 
-        private var lastTapTime: Long = 0
+        private var pendingLatchUntil: Long = 0
 
         fun tap(
             now: Long = System.currentTimeMillis(),
             isConsecutiveTap: Boolean,
             allowDoubleTapLatch: Boolean = true
         ): ShiftState {
-            val doubleTap = allowDoubleTapLatch &&
-                isConsecutiveTap &&
-                now - lastTapTime < doubleTapThreshold
-            lastTapTime = now
             state = when {
-                doubleTap -> if (state == ShiftState.CAPS) ShiftState.OFF else ShiftState.CAPS
-                state == ShiftState.OFF -> ShiftState.ONE_SHOT
-                else -> ShiftState.OFF
+                state == ShiftState.CAPS -> {
+                    pendingLatchUntil = 0
+                    ShiftState.OFF
+                }
+                state == ShiftState.ONE_SHOT -> {
+                    if (allowDoubleTapLatch && pendingLatchUntil > 0 && now <= pendingLatchUntil && isConsecutiveTap) {
+                        pendingLatchUntil = 0
+                        ShiftState.CAPS
+                    } else {
+                        pendingLatchUntil = if (allowDoubleTapLatch) now + doubleTapThreshold else 0
+                        ShiftState.OFF
+                    }
+                }
+                else -> {
+                    if (allowDoubleTapLatch && pendingLatchUntil > 0 && now <= pendingLatchUntil && isConsecutiveTap) {
+                        pendingLatchUntil = 0
+                        ShiftState.CAPS
+                    } else {
+                        pendingLatchUntil = if (allowDoubleTapLatch) now + doubleTapThreshold else 0
+                        ShiftState.ONE_SHOT
+                    }
+                }
             }
             return state
         }
@@ -68,6 +92,7 @@ class ModifierStateController(
         }
 
         fun setCapsLock(enabled: Boolean) {
+            pendingLatchUntil = 0
             state = if (enabled) ShiftState.CAPS else ShiftState.OFF
         }
 
@@ -77,7 +102,7 @@ class ModifierStateController(
 
         fun reset() {
             state = ShiftState.OFF
-            lastTapTime = 0
+            pendingLatchUntil = 0
         }
     }
 
@@ -92,9 +117,10 @@ class ModifierStateController(
     private val altState = ModifierKeyHandler.AltState()
 
     fun registerModifierTap(keyCode: Int): Boolean {
-        val isConsecutive = lastKeyWasModifier && lastModifierKeyCode == keyCode
+        val normalizedKeyCode = normalizeModifierTapKeyCode(keyCode)
+        val isConsecutive = lastKeyWasModifier && lastModifierKeyCode == normalizedKeyCode
         lastKeyWasModifier = true
-        lastModifierKeyCode = keyCode
+        lastModifierKeyCode = normalizedKeyCode
         return isConsecutive
     }
 
@@ -306,6 +332,7 @@ class ModifierStateController(
     fun handleCtrlKeyDown(
         keyCode: Int,
         isInputViewActive: Boolean,
+        eventTime: Long,
         onNavModeDeactivated: (() -> Unit)? = null
     ): ModifierKeyHandler.ModifierKeyResult {
         if (ctrlPressed) {
@@ -319,6 +346,7 @@ class ModifierStateController(
             isInputViewActive,
             isConsecutiveTap = isConsecutiveTap,
             allowDoubleTapLatch = true,
+            eventTime = eventTime,
             onNavModeDeactivated
         )
         val toggledOff = hadToggleState && !ctrlState.latchActive && !ctrlState.oneShot
@@ -332,14 +360,14 @@ class ModifierStateController(
         }
     }
 
-    fun handleCtrlKeyUp(keyCode: Int): ModifierKeyHandler.ModifierKeyResult {
+    fun handleCtrlKeyUp(keyCode: Int, eventTime: Long): ModifierKeyHandler.ModifierKeyResult {
         suppressCtrlKeyUp = false
-        val result = modifierKeyHandler.handleCtrlKeyUp(keyCode, ctrlState)
+        val result = modifierKeyHandler.handleCtrlKeyUp(keyCode, ctrlState, eventTime)
         ctrlPressed = false
         return result
     }
 
-    fun handleAltKeyDown(keyCode: Int): ModifierKeyHandler.ModifierKeyResult {
+    fun handleAltKeyDown(keyCode: Int, eventTime: Long): ModifierKeyHandler.ModifierKeyResult {
         if (altPressed) {
             return ModifierKeyHandler.ModifierKeyResult()
         }
@@ -349,7 +377,8 @@ class ModifierStateController(
             keyCode,
             altState,
             isConsecutiveTap = isConsecutiveTap,
-            allowDoubleTapLatch = true
+            allowDoubleTapLatch = true,
+            eventTime = eventTime
         )
         val toggledOff = hadToggleState && !altState.latchActive && !altState.oneShot
         suppressAltKeyUp = toggledOff
@@ -362,9 +391,9 @@ class ModifierStateController(
         }
     }
 
-    fun handleAltKeyUp(keyCode: Int): ModifierKeyHandler.ModifierKeyResult {
+    fun handleAltKeyUp(keyCode: Int, eventTime: Long): ModifierKeyHandler.ModifierKeyResult {
         suppressAltKeyUp = false
-        val result = modifierKeyHandler.handleAltKeyUp(keyCode, altState)
+        val result = modifierKeyHandler.handleAltKeyUp(keyCode, altState, eventTime)
         altPressed = false
         return result
     }

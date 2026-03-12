@@ -306,6 +306,7 @@ class InputEventRouter(
                 val result = controllers.modifierStateController.handleCtrlKeyDown(
                     keyCode,
                     params.isInputViewActive,
+                    event?.eventTime ?: System.currentTimeMillis(),
                     onNavModeDeactivated = {
                         navModeController.cancelNotification()
                     }
@@ -319,7 +320,10 @@ class InputEventRouter(
                     callbacks.updateStatusBar()
                 }
             }
-            return EditableFieldRoutingResult.CallSuper
+            // Keep Ctrl tap/latch handling inside the IME, like Alt. Let subsequent
+            // non-modifier keys carry the Ctrl semantics through Pastiera's own state
+            // rather than depending on the framework modifier dispatch path.
+            return EditableFieldRoutingResult.Consume
         }
 
         if (keyCode == KeyEvent.KEYCODE_ALT_LEFT || keyCode == KeyEvent.KEYCODE_ALT_RIGHT) {
@@ -338,7 +342,10 @@ class InputEventRouter(
                 }
             }
             if (!params.altPressed) {
-                val result = controllers.modifierStateController.handleAltKeyDown(keyCode)
+                val result = controllers.modifierStateController.handleAltKeyDown(
+                    keyCode,
+                    event?.eventTime ?: System.currentTimeMillis()
+                )
                 if (result.shouldUpdateStatusBar) {
                     callbacks.updateStatusBar()
                 }
