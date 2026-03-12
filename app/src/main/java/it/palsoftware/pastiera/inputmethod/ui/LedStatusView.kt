@@ -93,7 +93,7 @@ class LedStatusView(
     fun getView(): LinearLayout? = container
 
     fun update(snapshot: StatusBarController.StatusSnapshot) {
-        val shiftLocked = snapshot.capsLockEnabled
+        val shiftLocked = snapshot.capsLockEnabled || snapshot.shiftLayerLatched
         val shiftActive = (snapshot.shiftPhysicallyPressed || snapshot.shiftOneShot) && !shiftLocked
         updateLed(shiftLed, shiftLocked, shiftActive)
 
@@ -162,4 +162,3 @@ class LedStatusView(
         }.start()
     }
 }
-

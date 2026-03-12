@@ -4,7 +4,7 @@ import android.view.KeyEvent
 
 /**
  * Handles modifier key state management and double-tap detection
- * for Ctrl (latch) and Alt (latch).
+ * for Ctrl (one-shot/latch) and Alt (one-shot/latch).
  */
 class ModifierKeyHandler(
     private val doubleTapThreshold: Long = 500L
@@ -15,7 +15,8 @@ class ModifierKeyHandler(
         var latchActive: Boolean = false,
         var physicallyPressed: Boolean = false,
         var lastReleaseTime: Long = 0,
-        var latchFromNavMode: Boolean = false
+        var latchFromNavMode: Boolean = false,
+        var suppressNextReleaseTime: Boolean = false
     )
 
     data class AltState(
@@ -23,7 +24,8 @@ class ModifierKeyHandler(
         var oneShot: Boolean = false,
         var latchActive: Boolean = false,
         var physicallyPressed: Boolean = false,
-        var lastReleaseTime: Long = 0
+        var lastReleaseTime: Long = 0,
+        var suppressNextReleaseTime: Boolean = false
     )
 
     data class ModifierKeyResult(
@@ -39,6 +41,7 @@ class ModifierKeyHandler(
         state: CtrlState,
         isInputViewActive: Boolean,
         isConsecutiveTap: Boolean,
+        allowDoubleTapLatch: Boolean,
         onNavModeDeactivated: (() -> Unit)? = null
     ): ModifierKeyResult {
         if (keyCode != KeyEvent.KEYCODE_CTRL_LEFT && keyCode != KeyEvent.KEYCODE_CTRL_RIGHT) {
@@ -51,7 +54,7 @@ class ModifierKeyHandler(
 
         state.physicallyPressed = true
         val currentTime = System.currentTimeMillis()
-        val allowDoubleTap = isConsecutiveTap
+        val allowDoubleTap = allowDoubleTapLatch && isConsecutiveTap
         if (!allowDoubleTap) {
             state.lastReleaseTime = 0
         }
@@ -63,17 +66,20 @@ class ModifierKeyHandler(
                 if (state.latchFromNavMode && !isInputViewActive) {
                     state.latchActive = false
                     state.latchFromNavMode = false
+                    state.suppressNextReleaseTime = true
                     onNavModeDeactivated?.invoke()
                     state.lastReleaseTime = 0
                     return ModifierKeyResult(shouldConsume = true)
                 } else if (!state.latchFromNavMode) {
                     state.latchActive = false
+                    state.suppressNextReleaseTime = true
                     state.lastReleaseTime = 0
                     return ModifierKeyResult(shouldUpdateStatusBar = true)
                 } else {
                     // Nav mode in text field (should not happen)
                     state.latchActive = false
                     state.latchFromNavMode = false
+                    state.suppressNextReleaseTime = true
                     onNavModeDeactivated?.invoke()
                     state.lastReleaseTime = 0
                     return ModifierKeyResult(shouldUpdateStatusBar = true)
@@ -89,21 +95,17 @@ class ModifierKeyHandler(
                 } else {
                     // Single tap: disable one-shot
                     state.oneShot = false
+                    state.suppressNextReleaseTime = true
                     state.lastReleaseTime = 0
                     return ModifierKeyResult(shouldUpdateStatusBar = true)
                 }
             }
             else -> {
-                // Check for double-tap to enable latch
-                if (allowDoubleTap && currentTime - state.lastReleaseTime < doubleTapThreshold && state.lastReleaseTime > 0) {
-                    state.latchActive = true
-                    state.lastReleaseTime = 0
-                    return ModifierKeyResult(shouldUpdateStatusBar = true)
-                } else {
-                    // Single tap: enable one-shot
-                    state.oneShot = true
-                    return ModifierKeyResult(shouldUpdateStatusBar = true)
-                }
+                // Enter one-shot first. Latch is only reachable from a second tap
+                // while one-shot is already active, never directly from the off state.
+                state.oneShot = true
+                state.lastReleaseTime = 0
+                return ModifierKeyResult(shouldUpdateStatusBar = true)
             }
         }
     }
@@ -114,7 +116,12 @@ class ModifierKeyHandler(
         }
 
         if (state.pressed) {
-            state.lastReleaseTime = System.currentTimeMillis()
+            if (state.suppressNextReleaseTime) {
+                state.lastReleaseTime = 0
+                state.suppressNextReleaseTime = false
+            } else {
+                state.lastReleaseTime = System.currentTimeMillis()
+            }
             state.pressed = false
             state.physicallyPressed = false
             return ModifierKeyResult(shouldUpdateStatusBar = true)
@@ -127,7 +134,8 @@ class ModifierKeyHandler(
     fun handleAltKeyDown(
         keyCode: Int,
         state: AltState,
-        isConsecutiveTap: Boolean
+        isConsecutiveTap: Boolean,
+        allowDoubleTapLatch: Boolean
     ): ModifierKeyResult {
         if (keyCode != KeyEvent.KEYCODE_ALT_LEFT && keyCode != KeyEvent.KEYCODE_ALT_RIGHT) {
             return ModifierKeyResult()
@@ -139,7 +147,7 @@ class ModifierKeyHandler(
 
         state.physicallyPressed = true
         val currentTime = System.currentTimeMillis()
-        val allowDoubleTap = isConsecutiveTap
+        val allowDoubleTap = allowDoubleTapLatch && isConsecutiveTap
         if (!allowDoubleTap) {
             state.lastReleaseTime = 0
         }
@@ -148,6 +156,7 @@ class ModifierKeyHandler(
             state.latchActive -> {
                 // Latch active: single tap disables it
                 state.latchActive = false
+                state.suppressNextReleaseTime = true
                 state.lastReleaseTime = 0
                 return ModifierKeyResult(shouldUpdateStatusBar = true)
             }
@@ -161,21 +170,17 @@ class ModifierKeyHandler(
                 } else {
                     // Single tap: disable one-shot
                     state.oneShot = false
+                    state.suppressNextReleaseTime = true
                     state.lastReleaseTime = 0
                     return ModifierKeyResult(shouldUpdateStatusBar = true)
                 }
             }
             else -> {
-                // Check for double-tap to enable latch
-                if (allowDoubleTap && currentTime - state.lastReleaseTime < doubleTapThreshold && state.lastReleaseTime > 0) {
-                    state.latchActive = true
-                    state.lastReleaseTime = 0
-                    return ModifierKeyResult(shouldUpdateStatusBar = true)
-                } else {
-                    // Single tap: enable one-shot
-                    state.oneShot = true
-                    return ModifierKeyResult(shouldUpdateStatusBar = true)
-                }
+                // Enter one-shot first. Latch is only reachable from a second tap
+                // while one-shot is already active, never directly from the off state.
+                state.oneShot = true
+                state.lastReleaseTime = 0
+                return ModifierKeyResult(shouldUpdateStatusBar = true)
             }
         }
     }
@@ -186,7 +191,12 @@ class ModifierKeyHandler(
         }
 
         if (state.pressed) {
-            state.lastReleaseTime = System.currentTimeMillis()
+            if (state.suppressNextReleaseTime) {
+                state.lastReleaseTime = 0
+                state.suppressNextReleaseTime = false
+            } else {
+                state.lastReleaseTime = System.currentTimeMillis()
+            }
             state.pressed = false
             state.physicallyPressed = false
             return ModifierKeyResult(shouldUpdateStatusBar = true)
@@ -204,6 +214,7 @@ class ModifierKeyHandler(
         state.pressed = false
         state.oneShot = false
         state.lastReleaseTime = 0
+        state.suppressNextReleaseTime = false
     }
 
     fun resetAltState(state: AltState) {
@@ -211,5 +222,6 @@ class ModifierKeyHandler(
         state.oneShot = false
         state.latchActive = false
         state.lastReleaseTime = 0
+        state.suppressNextReleaseTime = false
     }
 }

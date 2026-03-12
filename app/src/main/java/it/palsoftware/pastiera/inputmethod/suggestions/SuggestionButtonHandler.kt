@@ -22,7 +22,8 @@ object SuggestionButtonHandler {
         suggestion: String,
         inputConnection: InputConnection?,
         listener: VariationButtonHandler.OnVariationSelectedListener? = null,
-        shouldDisableAutoCapitalize: Boolean
+        shouldDisableAutoCapitalize: Boolean,
+        onSuggestionCommitted: ((String) -> Unit)? = null
     ): View.OnClickListener {
         return View.OnClickListener {
             Log.d(TAG, "Click on suggestion button: $suggestion")
@@ -39,11 +40,24 @@ object SuggestionButtonHandler {
                 shouldDisableAutoCapitalize = shouldDisableAutoCapitalize
             ) && SettingsManager.getAutoCapitalizeFirstLetter(context)
 
-            val committed = replaceCurrentWord(inputConnection, suggestion, forceLeadingCapital)
+            val committed = commitSuggestion(inputConnection, suggestion, forceLeadingCapital)
             if (committed) {
                 NotificationHelper.triggerHapticFeedback(context)
+                onSuggestionCommitted?.invoke(suggestion)
             }
             listener?.onVariationSelected(suggestion)
+        }
+    }
+
+    fun commitSuggestion(
+        inputConnection: InputConnection,
+        suggestion: String,
+        forceLeadingCapital: Boolean
+    ): Boolean {
+        return if (isBetweenWords(inputConnection)) {
+            insertPredictedWord(inputConnection, suggestion, forceLeadingCapital)
+        } else {
+            replaceCurrentWord(inputConnection, suggestion, forceLeadingCapital)
         }
     }
 
@@ -143,6 +157,36 @@ object SuggestionButtonHandler {
         }
         val textToCommit = if (shouldAppendSpace) "$replacement " else replacement
         Log.d(TAG, "Suggestion inserted as '$textToCommit' (committed=$committed)")
+        return committed
+    }
+
+    private fun isBetweenWords(inputConnection: InputConnection): Boolean {
+        val before = inputConnection.getTextBeforeCursor(64, 0)?.toString().orEmpty()
+        val after = inputConnection.getTextAfterCursor(64, 0)?.toString().orEmpty()
+
+        fun isWordChar(ch: Char): Boolean = ch.isLetterOrDigit() || ch == '\''
+
+        val previousChar = before.lastOrNull()
+        val nextChar = after.firstOrNull()
+        val hasWordBefore = previousChar?.let(::isWordChar) == true
+        val hasWordAfter = nextChar?.let(::isWordChar) == true
+        return !hasWordBefore && !hasWordAfter
+    }
+
+    private fun insertPredictedWord(
+        inputConnection: InputConnection,
+        suggestion: String,
+        forceLeadingCapital: Boolean
+    ): Boolean {
+        val replacement = CasingHelper.applyCasing(suggestion, "", forceLeadingCapital)
+        val before = inputConnection.getTextBeforeCursor(2, 0)?.toString().orEmpty()
+        val needsLeadingSpace = before.isNotEmpty() && !before.last().isWhitespace()
+        val prefix = if (needsLeadingSpace) " " else ""
+        val committed = inputConnection.commitText("$prefix$replacement ", 1)
+        if (committed) {
+            AutoSpaceTracker.markAutoSpace()
+        }
+        Log.d(TAG, "Predicted suggestion inserted as '${prefix}${replacement} ' (committed=$committed)")
         return committed
     }
 }

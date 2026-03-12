@@ -35,9 +35,16 @@ class InputEventRouter(
     private val context: Context,
     private val navModeController: NavModeController
 ) {
+    companion object {
+        private const val KEYCODE_SYM_SHORTCUT_ALIAS: Int = KeyEvent.KEYCODE_F12
+    }
 
     var suggestionController: it.palsoftware.pastiera.core.suggestions.SuggestionController? = null
     var onCommitText: (() -> Unit)? = null
+
+    private fun isSymTriggerKey(keyCode: Int): Boolean {
+        return keyCode == KeyEvent.KEYCODE_SYM || keyCode == KEYCODE_SYM_SHORTCUT_ALIAS
+    }
 
     /**
      * Track in-word apostrophes so suggestions don't reset (e.g., "we'" -> "we'll").
@@ -116,7 +123,7 @@ class InputEventRouter(
         }
 
         // Gestisci SYM per Power Shortcuts (toggle: attiva/disattiva)
-        if (keyCode == KeyEvent.KEYCODE_SYM && powerShortcutsEnabled) {
+        if (isSymTriggerKey(keyCode) && powerShortcutsEnabled) {
             val message = context.getString(R.string.power_shortcuts_press_key)
             val isNavModeActive = navModeController.isNavModeActive()
             callbacks.togglePowerShortcutMode(message, isNavModeActive)
@@ -264,6 +271,13 @@ class InputEventRouter(
         var shiftOneShotActive = params.shiftOneShot
         var altLatchActive = params.altLatchActive
         var altOneShotActive = params.altOneShot
+        val shiftActive = params.shiftPressed
+        val ctrlActive =
+            params.ctrlPressed ||
+                params.ctrlLatchActive ||
+                params.ctrlOneShot ||
+                params.ctrlLatchFromNavMode
+        val altActive = params.altPressed || altLatchActive || altOneShotActive
         val ic = params.inputConnection
 
         if (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
@@ -281,7 +295,7 @@ class InputEventRouter(
         if (keyCode == KeyEvent.KEYCODE_CTRL_LEFT || keyCode == KeyEvent.KEYCODE_CTRL_RIGHT) {
             // Check if Alt is physically pressed (not latch) - if so, trigger speech recognition (if enabled)
             // Only trigger if both keys are physically pressed simultaneously, not if one is in latch
-            if (event?.isAltPressed == true && 
+            if (params.altPressed &&
                 !params.ctrlPressed &&
                 SettingsManager.getAltCtrlSpeechShortcutEnabled(context)) {
                 callbacks.startSpeechRecognition()
@@ -311,7 +325,7 @@ class InputEventRouter(
         if (keyCode == KeyEvent.KEYCODE_ALT_LEFT || keyCode == KeyEvent.KEYCODE_ALT_RIGHT) {
             // Check if Ctrl is physically pressed (not latch) - if so, trigger speech recognition (if enabled)
             // Only trigger if both keys are physically pressed simultaneously, not if one is in latch
-            if (event?.isCtrlPressed == true && 
+            if (params.ctrlPressed &&
                 !params.altPressed &&
                 SettingsManager.getAltCtrlSpeechShortcutEnabled(context)) {
                 callbacks.startSpeechRecognition()
@@ -332,11 +346,11 @@ class InputEventRouter(
             return EditableFieldRoutingResult.Consume
         }
 
-        if (keyCode == KeyEvent.KEYCODE_SYM) {
+        if (isSymTriggerKey(keyCode)) {
             // Reset Alt state if physically pressed when Sym is pressed.
             // Alt+Sym is Android's language switch shortcut, so we reset Alt to prevent
             // the one-shot state from being applied after the user switches languages.
-            if (event?.isAltPressed == true) {
+            if (params.altPressed || params.altLatchActive || params.altOneShot) {
                 controllers.modifierStateController.clearAltState(resetPressedState = true)
                 callbacks.updateStatusBar()
             }
@@ -391,7 +405,7 @@ class InputEventRouter(
             return EditableFieldRoutingResult.Consume
         }
 
-        if (event?.isAltPressed == true || altLatchActive || altOneShotActive) {
+        if (altActive) {
             controllers.altSymManager.cancelPendingLongPress(keyCode)
             if (altOneShotActive) {
                 callbacks.clearAltOneShot()
@@ -417,7 +431,7 @@ class InputEventRouter(
             }
         }
 
-        if (event?.isCtrlPressed == true || params.ctrlLatchActive || params.ctrlOneShot) {
+        if (ctrlActive) {
             if (
                 handleCtrlModifiedKey(
                     keyCode = keyCode,
@@ -443,8 +457,8 @@ class InputEventRouter(
         val resolvedUppercase = mapping?.let {
             when {
                 shiftOneShotActive -> true
-                params.capsLockEnabled && event?.isShiftPressed != true -> true
-                event?.isShiftPressed == true -> true
+                params.capsLockEnabled && !shiftActive -> true
+                shiftActive -> true
                 else -> false
             }
         } ?: false
@@ -455,19 +469,19 @@ class InputEventRouter(
         val charForLongPress = if (LayoutMappingRepository.isMapped(keyCode)) {
             LayoutMappingRepository.getCharacterWithModifiers(
                 keyCode,
-                event?.isShiftPressed == true,
+                shiftActive,
                 params.capsLockEnabled,
                 shiftOneShotActive
             )
         } else {
-            callbacks.getCharacterFromLayout(keyCode, event, event?.isShiftPressed == true)
+            callbacks.getCharacterFromLayout(keyCode, event, shiftActive)
         }
         val hasLongPressSupport = when (longPressMode) {
             "shift" -> !longPressSuppressed && event != null && event.unicodeChar != 0 && event.unicodeChar.toChar().isLetter()
             "variations" -> !longPressSuppressed && charForLongPress != null && controllers.variationStateController.hasVariationsFor(charForLongPress)
             "sym" -> !longPressSuppressed && controllers.altSymManager.hasSymLongPressMapping(
                 keyCode = keyCode,
-                shiftPressed = event?.isShiftPressed == true || shiftOneShotActive
+                shiftPressed = shiftActive || shiftOneShotActive
             )
             else -> !longPressSuppressed && controllers.altSymManager.hasAltMapping(keyCode)
         }
@@ -497,7 +511,7 @@ class InputEventRouter(
             val trackedChar = if (LayoutMappingRepository.isMapped(keyCode)) {
                 LayoutMappingRepository.getCharacterStringWithModifiers(
                     keyCode,
-                    event?.isShiftPressed == true,
+                    shiftActive,
                     params.capsLockEnabled,
                     shiftOneShotActive
                 )
@@ -507,7 +521,7 @@ class InputEventRouter(
             val layoutChar = callbacks.getCharacterFromLayout(
                 keyCode,
                 event,
-                event?.isShiftPressed == true
+                shiftActive
             )
             if (ic != null) {
                 controllers.altSymManager.handleKeyWithAltMapping(
@@ -538,7 +552,7 @@ class InputEventRouter(
         if (shiftOneShotActive) {
             val char = LayoutMappingRepository.getCharacterStringWithModifiers(
                 keyCode,
-                event?.isShiftPressed == true,
+                shiftActive,
                 params.capsLockEnabled,
                 true
             )
@@ -555,7 +569,7 @@ class InputEventRouter(
         if (params.capsLockEnabled && LayoutMappingRepository.isMapped(keyCode)) {
             val char = LayoutMappingRepository.getCharacterStringWithModifiers(
                 keyCode,
-                event?.isShiftPressed == true,
+                shiftActive,
                 params.capsLockEnabled,
                 false
             )
@@ -571,12 +585,12 @@ class InputEventRouter(
         val charForVariations = if (LayoutMappingRepository.isMapped(keyCode)) {
             LayoutMappingRepository.getCharacterWithModifiers(
                 keyCode,
-                event?.isShiftPressed == true,
+                shiftActive,
                 params.capsLockEnabled,
                 shiftOneShotActive
             )
         } else {
-            callbacks.getCharacterFromLayout(keyCode, event, event?.isShiftPressed == true)
+            callbacks.getCharacterFromLayout(keyCode, event, shiftActive)
         }
         if (charForVariations != null) {
             if (controllers.variationStateController.hasVariationsFor(charForVariations)) {
@@ -592,7 +606,7 @@ class InputEventRouter(
         if (isAlphabeticKey && LayoutMappingRepository.isMapped(keyCode)) {
             val char = LayoutMappingRepository.getCharacterStringWithModifiers(
                 keyCode,
-                event?.isShiftPressed == true,
+                shiftActive,
                 params.capsLockEnabled,
                 shiftOneShotActive
             )
@@ -1007,12 +1021,6 @@ class InputEventRouter(
             return true
         }
 
-        // When Ctrl is physically held, prefer native app shortcuts (rich-text editors, IDEs, etc.).
-        // This must take precedence over one-shot, because a physical press sets one-shot internally.
-        if (isPhysicalCtrlCombo && !ctrlLatchFromNavMode) {
-            return passThroughCtrlCombo()
-        }
-
         if (ctrlOneShot && !ctrlLatchFromNavMode) {
             clearCtrlOneShot()
             updateStatusBar()
@@ -1077,7 +1085,11 @@ class InputEventRouter(
                                 return true
                             }
                             // Unknown action: let the target app handle the original Ctrl combo.
-                            return callSuper()
+                            return if (isPhysicalCtrlCombo && !ctrlLatchFromNavMode) {
+                                passThroughCtrlCombo()
+                            } else {
+                                callSuper()
+                            }
                         }
                     }
                 }
@@ -1123,7 +1135,11 @@ class InputEventRouter(
                         return true
                     }
                     // Unknown keycode mapping: fallback to app-native Ctrl handling.
-                    return callSuper()
+                    return if (isPhysicalCtrlCombo && !ctrlLatchFromNavMode) {
+                        passThroughCtrlCombo()
+                    } else {
+                        callSuper()
+                    }
                 }
             }
         } else {
@@ -1167,7 +1183,11 @@ class InputEventRouter(
             }
 
             // No explicit Pastiera mapping: preserve app-native Ctrl shortcuts (e.g. Ctrl+B/Ctrl+I).
-            return callSuper()
+            return if (isPhysicalCtrlCombo && !ctrlLatchFromNavMode) {
+                passThroughCtrlCombo()
+            } else {
+                callSuper()
+            }
         }
 
         return false

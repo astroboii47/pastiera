@@ -12,6 +12,7 @@ import it.palsoftware.pastiera.inputmethod.statusbar.button.MicrophoneButtonFact
 import it.palsoftware.pastiera.inputmethod.statusbar.button.SettingsButtonFactory
 import it.palsoftware.pastiera.inputmethod.statusbar.button.SymbolsButtonFactory
 import it.palsoftware.pastiera.inputmethod.statusbar.button.StatusBarButtonFactory
+import it.palsoftware.pastiera.inputmethod.statusbar.button.VariationsButtonFactory
 
 /**
  * Central registry for status bar button factories.
@@ -44,6 +45,7 @@ class StatusBarButtonRegistry {
     private val minimalUiFactory = MinimalUiButtonFactory()
     private val settingsFactory = SettingsButtonFactory()
     private val symbolsFactory = SymbolsButtonFactory()
+    private val variationsFactory = VariationsButtonFactory()
     
     init {
         // Register built-in button factories
@@ -55,6 +57,7 @@ class StatusBarButtonRegistry {
         factories[StatusBarButtonId.MinimalUi] = minimalUiFactory
         factories[StatusBarButtonId.Settings] = settingsFactory
         factories[StatusBarButtonId.Symbols] = symbolsFactory
+        factories[StatusBarButtonId.Variations] = variationsFactory
     }
     
     /**
@@ -76,7 +79,7 @@ class StatusBarButtonRegistry {
      * @return true if the factory was removed, false if it wasn't registered or is built-in
      */
     fun unregister(id: StatusBarButtonId): Boolean {
-        if (id in listOf(StatusBarButtonId.Clipboard, StatusBarButtonId.Microphone, StatusBarButtonId.Language, StatusBarButtonId.Emoji, StatusBarButtonId.Hamburger, StatusBarButtonId.MinimalUi, StatusBarButtonId.Settings, StatusBarButtonId.Symbols)) {
+        if (id in listOf(StatusBarButtonId.Clipboard, StatusBarButtonId.Microphone, StatusBarButtonId.Language, StatusBarButtonId.Emoji, StatusBarButtonId.Hamburger, StatusBarButtonId.MinimalUi, StatusBarButtonId.Settings, StatusBarButtonId.Symbols, StatusBarButtonId.Variations)) {
             return false // Cannot unregister built-in buttons
         }
         return factories.remove(id) != null
@@ -196,6 +199,7 @@ class StatusBarButtonRegistry {
             SettingsManager.STATUS_BAR_BUTTON_HAMBURGER -> StatusBarButtonId.Hamburger
             SettingsManager.STATUS_BAR_BUTTON_SETTINGS -> StatusBarButtonId.Settings
             SettingsManager.STATUS_BAR_BUTTON_SYMBOLS -> StatusBarButtonId.Symbols
+            SettingsManager.STATUS_BAR_BUTTON_VARIATIONS -> StatusBarButtonId.Variations
             SettingsManager.STATUS_BAR_BUTTON_NONE -> null
             else -> null
         }

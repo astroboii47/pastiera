@@ -31,6 +31,7 @@ object SettingsManager {
     private const val KEY_AUTO_CORRECT_ENABLED = "auto_correct_enabled"
     private const val KEY_AUTO_CORRECT_ENABLED_LANGUAGES = "auto_correct_enabled_languages"
     private const val KEY_SUGGESTIONS_ENABLED = "suggestions_enabled"
+    private const val KEY_NEXT_WORD_PREDICTIONS_ENABLED = "next_word_predictions_enabled"
     private const val KEY_ACCENT_MATCHING_ENABLED = "accent_matching_enabled"
     private const val KEY_AUTO_REPLACE_ON_SPACE_ENTER = "auto_replace_on_space_enter"
     private const val KEY_MAX_AUTO_REPLACE_DISTANCE = "max_auto_replace_distance"
@@ -54,12 +55,19 @@ object SettingsManager {
     private const val KEY_CLIPBOARD_RETENTION_TIME = "clipboard_retention_time" // How long to keep clipboard entries (in minutes)
     private const val KEY_EMOJI_SHORTCODE_ENABLED = "emoji_shortcode_enabled" // Enable emoji shortcodes (:smile: -> 😊)
     private const val KEY_SYMBOL_SHORTCODE_ENABLED = "symbol_shortcode_enabled" // Enable symbol shortcodes (:tm: -> ™)
+    private const val KEY_SNIPPETS_ENABLED = "snippets_enabled" // Enable snippet lookup and expansion
+    private const val KEY_SNIPPETS_TRIGGER = "snippets_trigger" // Single-character snippet trigger
+    private const val KEY_SNIPPETS = "snippets" // JSON object of shortcut -> expansion
     private const val KEY_KLIPY_API_KEY = "klipy_api_key" // API key used for GIF search
+    private const val KEY_LOCAL_MEDIA_FOLDER_URI = "local_media_folder_uri" // Persisted SAF tree uri for local media tab
     private const val KEY_TRACKPAD_GESTURES_ENABLED = "trackpad_gestures_enabled" // Whether trackpad gesture suggestions are enabled
     private const val KEY_TRACKPAD_SWIPE_THRESHOLD = "trackpad_swipe_threshold" // Threshold for swipe detection on trackpad
     private const val KEY_SHIFT_BACKSPACE_DELETE = "shift_backspace_delete" // Shift + Backspace performs forward delete
     private const val KEY_ALT_BACKSPACE_DELETE = "alt_backspace_delete" // Alt + Backspace performs forward delete
     private const val KEY_BACKSPACE_AT_START_DELETE = "backspace_at_start_delete" // Backspace at line start performs forward delete
+    private const val KEY_SHIFT_KEYMAPPER_GUARD_ENABLED = "shift_keymapper_guard_enabled" // Ignore synthetic rapid second Shift presses from remappers
+    private const val KEY_CTRL_KEYMAPPER_GUARD_ENABLED = "ctrl_keymapper_guard_enabled" // Ignore synthetic rapid second Ctrl presses from remappers
+    private const val KEY_ALT_KEYMAPPER_GUARD_ENABLED = "alt_keymapper_guard_enabled" // Ignore synthetic rapid second Alt presses from remappers
     private const val KEY_PASTIERINA_MODE_OVERRIDE = "pastierina_mode_override" // follow_system | force_minimal | force_full
     private const val KEY_PASTIERINA_MODE_ACTIVE = "pastierina_mode_active" // Current effective state
     private const val KEY_TITAN2_LAYOUT_ENABLED = "titan2_layout_enabled" // Align OSK with Titan 2 physical layout
@@ -82,6 +90,7 @@ object SettingsManager {
     const val STATUS_BAR_BUTTON_HAMBURGER = "hamburger"
     const val STATUS_BAR_BUTTON_SETTINGS = "settings"
     const val STATUS_BAR_BUTTON_SYMBOLS = "symbols"
+    const val STATUS_BAR_BUTTON_VARIATIONS = "variations"
     
     // Default slot assignments
     private const val DEFAULT_SLOT_LEFT = STATUS_BAR_BUTTON_HAMBURGER
@@ -105,6 +114,7 @@ object SettingsManager {
     private const val DEFAULT_ALT_CTRL_SPEECH_SHORTCUT = true
     private const val DEFAULT_AUTO_CORRECT_ENABLED = true
     private const val DEFAULT_SUGGESTIONS_ENABLED = true
+    private const val DEFAULT_NEXT_WORD_PREDICTIONS_ENABLED = false
     private const val DEFAULT_ACCENT_MATCHING_ENABLED = true
     private const val DEFAULT_AUTO_REPLACE_ON_SPACE_ENTER = false
     private const val DEFAULT_MAX_AUTO_REPLACE_DISTANCE = 1
@@ -130,7 +140,10 @@ object SettingsManager {
     private const val DEFAULT_CLIPBOARD_RETENTION_TIME = 120L // 2 hours in minutes
     private const val DEFAULT_EMOJI_SHORTCODE_ENABLED = true
     private const val DEFAULT_SYMBOL_SHORTCODE_ENABLED = true
+    private const val DEFAULT_SNIPPETS_ENABLED = true
+    private const val DEFAULT_SNIPPETS_TRIGGER = "!"
     private const val DEFAULT_KLIPY_API_KEY = ""
+    private const val DEFAULT_LOCAL_MEDIA_FOLDER_URI = ""
     private const val DEFAULT_TRACKPAD_GESTURES_ENABLED = false
     private const val DEFAULT_TRACKPAD_SWIPE_THRESHOLD = 300f
     private const val MIN_TRACKPAD_SWIPE_THRESHOLD = 120f
@@ -138,6 +151,9 @@ object SettingsManager {
     private const val DEFAULT_SHIFT_BACKSPACE_DELETE = false
     private const val DEFAULT_ALT_BACKSPACE_DELETE = false
     private const val DEFAULT_BACKSPACE_AT_START_DELETE = false
+    private const val DEFAULT_SHIFT_KEYMAPPER_GUARD_ENABLED = false
+    private const val DEFAULT_CTRL_KEYMAPPER_GUARD_ENABLED = false
+    private const val DEFAULT_ALT_KEYMAPPER_GUARD_ENABLED = false
     private const val DEFAULT_ACCESSIBILITY_LIVE_ANNOUNCEMENTS_ENABLED = false
     private const val DEFAULT_ACCESSIBILITY_READ_SECOND_ROW_ENABLED = false
     private const val DEFAULT_ACCESSIBILITY_SUGGESTIONS_ANNOUNCEMENT_DELAY_MS = 500L
@@ -532,6 +548,45 @@ object SettingsManager {
             .apply()
     }
 
+    fun getShiftKeymapperGuardEnabled(context: Context): Boolean {
+        return getPreferences(context).getBoolean(
+            KEY_SHIFT_KEYMAPPER_GUARD_ENABLED,
+            DEFAULT_SHIFT_KEYMAPPER_GUARD_ENABLED
+        )
+    }
+
+    fun setShiftKeymapperGuardEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_SHIFT_KEYMAPPER_GUARD_ENABLED, enabled)
+            .apply()
+    }
+
+    fun getCtrlKeymapperGuardEnabled(context: Context): Boolean {
+        return getPreferences(context).getBoolean(
+            KEY_CTRL_KEYMAPPER_GUARD_ENABLED,
+            DEFAULT_CTRL_KEYMAPPER_GUARD_ENABLED
+        )
+    }
+
+    fun setCtrlKeymapperGuardEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_CTRL_KEYMAPPER_GUARD_ENABLED, enabled)
+            .apply()
+    }
+
+    fun getAltKeymapperGuardEnabled(context: Context): Boolean {
+        return getPreferences(context).getBoolean(
+            KEY_ALT_KEYMAPPER_GUARD_ENABLED,
+            DEFAULT_ALT_KEYMAPPER_GUARD_ENABLED
+        )
+    }
+
+    fun setAltKeymapperGuardEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_ALT_KEYMAPPER_GUARD_ENABLED, enabled)
+            .apply()
+    }
+
     /**
      * Returns whether the static variation bar mode is enabled.
      * When enabled, the variation row shows a fixed set of utility keys
@@ -848,6 +903,19 @@ object SettingsManager {
     fun setSuggestionsEnabled(context: Context, enabled: Boolean) {
         getPreferences(context).edit()
             .putBoolean(KEY_SUGGESTIONS_ENABLED, enabled)
+            .apply()
+    }
+
+    fun getNextWordPredictionsEnabled(context: Context): Boolean {
+        return getPreferences(context).getBoolean(
+            KEY_NEXT_WORD_PREDICTIONS_ENABLED,
+            DEFAULT_NEXT_WORD_PREDICTIONS_ENABLED
+        )
+    }
+
+    fun setNextWordPredictionsEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_NEXT_WORD_PREDICTIONS_ENABLED, enabled)
             .apply()
     }
 
@@ -1930,6 +1998,59 @@ object SettingsManager {
             .apply()
     }
 
+    fun getSnippetsEnabled(context: Context): Boolean {
+        return getPreferences(context).getBoolean(KEY_SNIPPETS_ENABLED, DEFAULT_SNIPPETS_ENABLED)
+    }
+
+    fun setSnippetsEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_SNIPPETS_ENABLED, enabled)
+            .apply()
+    }
+
+    fun getSnippetsTrigger(context: Context): String {
+        val stored = getPreferences(context).getString(KEY_SNIPPETS_TRIGGER, DEFAULT_SNIPPETS_TRIGGER).orEmpty()
+        return stored.take(1).ifEmpty { DEFAULT_SNIPPETS_TRIGGER }
+    }
+
+    fun setSnippetsTrigger(context: Context, trigger: String) {
+        val normalized = trigger.trim().take(1).ifEmpty { DEFAULT_SNIPPETS_TRIGGER }
+        getPreferences(context).edit()
+            .putString(KEY_SNIPPETS_TRIGGER, normalized)
+            .apply()
+    }
+
+    fun getSnippets(context: Context): LinkedHashMap<String, String> {
+        val jsonString = getPreferences(context).getString(KEY_SNIPPETS, null) ?: return linkedMapOf()
+        return try {
+            val jsonObject = JSONObject(jsonString)
+            val snippets = linkedMapOf<String, String>()
+            val keys = jsonObject.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                snippets[key] = jsonObject.getString(key)
+            }
+            snippets
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading snippets", e)
+            linkedMapOf()
+        }
+    }
+
+    fun saveSnippets(context: Context, snippets: Map<String, String>) {
+        try {
+            val jsonObject = JSONObject()
+            snippets.forEach { (shortcut, value) ->
+                jsonObject.put(shortcut.lowercase(), value)
+            }
+            getPreferences(context).edit()
+                .putString(KEY_SNIPPETS, jsonObject.toString())
+                .apply()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving snippets", e)
+        }
+    }
+
     fun getKlipyApiKey(context: Context): String {
         return getPreferences(context).getString(KEY_KLIPY_API_KEY, DEFAULT_KLIPY_API_KEY) ?: DEFAULT_KLIPY_API_KEY
     }
@@ -1937,6 +2058,17 @@ object SettingsManager {
     fun setKlipyApiKey(context: Context, apiKey: String) {
         getPreferences(context).edit()
             .putString(KEY_KLIPY_API_KEY, apiKey.trim())
+            .apply()
+    }
+
+    fun getLocalMediaFolderUri(context: Context): String {
+        return getPreferences(context).getString(KEY_LOCAL_MEDIA_FOLDER_URI, DEFAULT_LOCAL_MEDIA_FOLDER_URI)
+            ?: DEFAULT_LOCAL_MEDIA_FOLDER_URI
+    }
+
+    fun setLocalMediaFolderUri(context: Context, uri: String) {
+        getPreferences(context).edit()
+            .putString(KEY_LOCAL_MEDIA_FOLDER_URI, uri.trim())
             .apply()
     }
 
@@ -2241,7 +2373,8 @@ object SettingsManager {
             STATUS_BAR_BUTTON_LANGUAGE,
             STATUS_BAR_BUTTON_HAMBURGER,
             STATUS_BAR_BUTTON_SETTINGS,
-            STATUS_BAR_BUTTON_SYMBOLS
+            STATUS_BAR_BUTTON_SYMBOLS,
+            STATUS_BAR_BUTTON_VARIATIONS
         )
     }
 }

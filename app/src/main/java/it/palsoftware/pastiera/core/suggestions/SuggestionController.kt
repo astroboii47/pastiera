@@ -32,6 +32,8 @@ class SuggestionController(
     private val appContext = context.applicationContext
     private val debugLogging: Boolean = debugLogging
     private val userDictionaryStore = UserDictionaryStore()
+    private var nextWordPredictor = buildNextWordPredictor(currentLocale)
+    private var bundledPhrasePredictor = buildBundledPhrasePredictor(currentLocale)
     private var dictionaryRepository: DictionaryRepository = AndroidDictionaryRepository(appContext, assets, userDictionaryStore, baseLocale = currentLocale, debugLogging = debugLogging)
     private var suggestionEngine = SuggestionEngine(dictionaryRepository, locale = currentLocale, debugLogging = debugLogging).apply {
         setKeyboardLayout(keyboardLayoutProvider())
@@ -54,6 +56,7 @@ class SuggestionController(
         }
     )
     private var autoReplaceController = AutoReplaceController(dictionaryRepository, suggestionEngine, settingsProvider)
+    private var lastCommittedWord: String? = null
     
     /**
      * Updates the locale and reloads the dictionary for the new language.
@@ -66,6 +69,8 @@ class SuggestionController(
         currentLoadJob = null
         
         currentLocale = newLocale
+        nextWordPredictor = buildNextWordPredictor(currentLocale)
+        bundledPhrasePredictor = buildBundledPhrasePredictor(currentLocale)
         dictionaryRepository = AndroidDictionaryRepository(appContext, assets, userDictionaryStore, baseLocale = currentLocale, debugLogging = debugLogging)
         suggestionEngine = SuggestionEngine(dictionaryRepository, locale = currentLocale, debugLogging = debugLogging).apply {
             setKeyboardLayout(keyboardLayoutProvider())
@@ -95,6 +100,7 @@ class SuggestionController(
         
         // Reset tracker and clear suggestions
         tracker.reset()
+        lastCommittedWord = null
         suggestionsListener?.invoke(emptyList())
     }
 
@@ -197,6 +203,7 @@ class SuggestionController(
         }
         ensureDictionaryLoaded()
 
+        val completedWord = tracker.currentWord.trim()
         // CRITICAL FIX: Sync tracker with actual text before processing boundary
         // The cursor debounce can cause tracker to be out of sync with the actual text field
         if (inputConnection != null && dictionaryRepository.isReady) {
@@ -213,7 +220,18 @@ class SuggestionController(
         } else {
             pendingAddUserWord = null
         }
-        suggestionsListener?.invoke(emptyList())
+        val settings = settingsProvider()
+        val nextPredictions = if (
+            settings.suggestionsEnabled &&
+            settings.nextWordPredictionsEnabled &&
+            completedWord.isNotBlank()
+        ) {
+            learnAndPredictNextWords(completedWord, settings.maxSuggestions)
+        } else {
+            emptyList()
+        }
+        latestSuggestions.set(nextPredictions)
+        suggestionsListener?.invoke(nextPredictions)
         return result
     }
 
@@ -281,7 +299,17 @@ class SuggestionController(
                 ))
                 // #endregion
             } else {
+                val settings = settingsProvider()
+                if (
+                    settings.nextWordPredictionsEnabled &&
+                    lastCommittedWord != null &&
+                    latestSuggestions.get().isNotEmpty()
+                ) {
+                    // Keep next-word predictions visible while the cursor sits between words.
+                    return@Runnable
+                }
                 tracker.reset()
+                latestSuggestions.set(emptyList())
                 suggestionsListener?.invoke(emptyList())
             }
         }
@@ -291,13 +319,17 @@ class SuggestionController(
     fun onContextReset() {
         if (!isEnabled()) return
         tracker.onContextChanged()
+        lastCommittedWord = null
         pendingAddUserWord = null
+        latestSuggestions.set(emptyList())
         suggestionsListener?.invoke(emptyList())
     }
 
     fun onNavModeToggle() {
         if (!isEnabled()) return
         tracker.onContextChanged()
+        lastCommittedWord = null
+        latestSuggestions.set(emptyList())
     }
 
     fun addUserWord(word: String) {
@@ -317,6 +349,98 @@ class SuggestionController(
     }
 
     fun currentSuggestions(): List<SuggestionResult> = latestSuggestions.get()
+
+    fun onSuggestionAccepted(acceptedWord: String) {
+        if (!isEnabled()) return
+        tracker.reset()
+        pendingAddUserWord = null
+
+        val settings = settingsProvider()
+        if (settings.suggestionsEnabled && settings.nextWordPredictionsEnabled) {
+            val nextPredictions = learnAndPredictNextWords(acceptedWord, settings.maxSuggestions)
+            latestSuggestions.set(nextPredictions)
+            suggestionsListener?.invoke(nextPredictions)
+        } else {
+            latestSuggestions.set(emptyList())
+            suggestionsListener?.invoke(emptyList())
+        }
+    }
+
+    private fun learnAndPredictNextWords(completedWord: String, limit: Int): List<SuggestionResult> {
+        val previousWord = lastCommittedWord
+        if (!previousWord.isNullOrBlank()) {
+            nextWordPredictor.recordTransition(previousWord, completedWord)
+        }
+        lastCommittedWord = completedWord
+        val mergedResults = linkedMapOf<String, SuggestionResult>()
+
+        nextWordPredictor.predictNextWords(completedWord, limit)
+            .forEachIndexed { index, candidate ->
+                mergedResults.putIfAbsent(
+                    candidate,
+                    SuggestionResult(
+                        candidate = candidate,
+                        distance = 0,
+                        score = (limit - index + 3).toDouble(),
+                        source = SuggestionSource.USER
+                    )
+                )
+            }
+
+        bundledPhrasePredictor.predictContextual(
+            previousWord = completedWord,
+            previousPreviousWord = previousWord,
+            limit = limit
+        ).forEachIndexed { index, candidate ->
+            mergedResults.putIfAbsent(
+                candidate,
+                SuggestionResult(
+                    candidate = candidate,
+                    distance = 0,
+                    score = (limit - index + 1).toDouble(),
+                    source = SuggestionSource.MAIN
+                )
+            )
+        }
+
+        val remainingSlots = limit - mergedResults.size
+        if (remainingSlots > 0) {
+            bundledPhrasePredictor.fallbackWords(remainingSlots * 2).forEachIndexed { index, candidate ->
+                if (candidate.equals(completedWord, ignoreCase = true)) return@forEachIndexed
+                mergedResults.putIfAbsent(
+                    candidate,
+                    SuggestionResult(
+                        candidate = candidate,
+                        distance = 0,
+                        score = (remainingSlots - index).coerceAtLeast(1).toDouble(),
+                        source = SuggestionSource.MAIN
+                    )
+                )
+            }
+        }
+
+        return mergedResults.values.take(limit)
+    }
+
+    private fun buildNextWordPredictor(locale: Locale): NextWordPredictor {
+        return NextWordPredictor(
+            context = appContext,
+            locale = locale,
+            isValidWord = { candidate ->
+                dictionaryRepository.isKnownWord(candidate) || dictionaryRepository.getExactWordFrequency(candidate) > 0
+            }
+        )
+    }
+
+    private fun buildBundledPhrasePredictor(locale: Locale): BundledPhrasePredictor {
+        return BundledPhrasePredictor(
+            context = appContext,
+            locale = locale,
+            isValidWord = { candidate ->
+                dictionaryRepository.isKnownWord(candidate) || dictionaryRepository.getExactWordFrequency(candidate) > 0
+            }
+        )
+    }
 
     fun userDictionarySnapshot(): List<UserDictionaryStore.UserEntry> = userDictionaryStore.getSnapshot()
 

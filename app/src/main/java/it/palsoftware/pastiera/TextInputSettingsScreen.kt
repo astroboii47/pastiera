@@ -33,6 +33,7 @@ fun TextInputSettingsScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    var showSnippetsScreen by remember { mutableStateOf(false) }
     
     var autoCapitalizeFirstLetter by remember {
         mutableStateOf(SettingsManager.getAutoCapitalizeFirstLetter(context))
@@ -50,6 +51,18 @@ fun TextInputSettingsScreen(
         mutableStateOf(SettingsManager.getClearAltOnSpace(context))
     }
 
+    var shiftKeymapperGuardEnabled by remember {
+        mutableStateOf(SettingsManager.getShiftKeymapperGuardEnabled(context))
+    }
+
+    var ctrlKeymapperGuardEnabled by remember {
+        mutableStateOf(SettingsManager.getCtrlKeymapperGuardEnabled(context))
+    }
+
+    var altKeymapperGuardEnabled by remember {
+        mutableStateOf(SettingsManager.getAltKeymapperGuardEnabled(context))
+    }
+
     var emojiShortcodeEnabled by remember {
         mutableStateOf(SettingsManager.getEmojiShortcodeEnabled(context))
     }
@@ -58,12 +71,22 @@ fun TextInputSettingsScreen(
         mutableStateOf(SettingsManager.getSymbolShortcodeEnabled(context))
     }
 
+    var snippetsEnabled by remember {
+        mutableStateOf(SettingsManager.getSnippetsEnabled(context))
+    }
+
+    var snippetsTrigger by remember {
+        mutableStateOf(SettingsManager.getSnippetsTrigger(context))
+    }
+
     var klipyApiKey by remember {
         mutableStateOf(SettingsManager.getKlipyApiKey(context))
     }
 
     var showKlipyDialog by remember { mutableStateOf(false) }
     var pendingKlipyApiKey by remember { mutableStateOf(klipyApiKey) }
+    var showSnippetsTriggerDialog by remember { mutableStateOf(false) }
+    var pendingSnippetsTrigger by remember { mutableStateOf(snippetsTrigger) }
     
     var swipeToDelete by remember {
         mutableStateOf(SettingsManager.getSwipeToDelete(context))
@@ -94,7 +117,21 @@ fun TextInputSettingsScreen(
     }
     
     // Handle system back button
-    BackHandler { onBack() }
+    BackHandler {
+        if (showSnippetsScreen) {
+            showSnippetsScreen = false
+        } else {
+            onBack()
+        }
+    }
+
+    if (showSnippetsScreen) {
+        SnippetsScreen(
+            modifier = modifier,
+            onBack = { showSnippetsScreen = false }
+        )
+        return
+    }
     
     Scaffold(
         topBar = {
@@ -124,7 +161,14 @@ fun TextInputSettingsScreen(
                     )
                 }
             }
-
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+        ) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -169,14 +213,93 @@ fun TextInputSettingsScreen(
                     }
                 }
             }
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-        ) {
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.TextFields,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.snippets_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = stringResource(R.string.snippets_setting_description, snippetsTrigger),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2
+                        )
+                    }
+                    Switch(
+                        checked = snippetsEnabled,
+                        onCheckedChange = { enabled ->
+                            snippetsEnabled = enabled
+                            SettingsManager.setSnippetsEnabled(context, enabled)
+                        }
+                    )
+                }
+            }
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.TextFields,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.snippets_manage_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = stringResource(R.string.snippets_manage_description, snippetsTrigger),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2
+                        )
+                    }
+                    TextButton(onClick = {
+                        pendingSnippetsTrigger = snippetsTrigger
+                        showSnippetsTriggerDialog = true
+                    }) {
+                        Text(stringResource(R.string.snippets_trigger_button))
+                    }
+                    TextButton(onClick = { showSnippetsScreen = true }) {
+                        Text(stringResource(R.string.snippets_manage_button))
+                    }
+                }
+            }
+
             // Auto Capitalize
             Surface(
                 modifier = Modifier
@@ -424,6 +547,104 @@ fun TextInputSettingsScreen(
                             SettingsManager.setClearAltOnSpace(context, enabled)
                         }
                     )
+                }
+            }
+
+            // Keymapper Guard
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.TextFields,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.keymapper_modifier_guard_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = stringResource(R.string.keymapper_modifier_guard_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = stringResource(R.string.keymapper_guard_shift_title),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = shiftKeymapperGuardEnabled,
+                            onCheckedChange = { enabled ->
+                                shiftKeymapperGuardEnabled = enabled
+                                SettingsManager.setShiftKeymapperGuardEnabled(context, enabled)
+                            }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = stringResource(R.string.keymapper_guard_ctrl_title),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = ctrlKeymapperGuardEnabled,
+                            onCheckedChange = { enabled ->
+                                ctrlKeymapperGuardEnabled = enabled
+                                SettingsManager.setCtrlKeymapperGuardEnabled(context, enabled)
+                            }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = stringResource(R.string.keymapper_guard_alt_title),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = altKeymapperGuardEnabled,
+                            onCheckedChange = { enabled ->
+                                altKeymapperGuardEnabled = enabled
+                                SettingsManager.setAltKeymapperGuardEnabled(context, enabled)
+                            }
+                        )
+                    }
                 }
             }
 
@@ -692,6 +913,42 @@ fun TextInputSettingsScreen(
                     TextButton(onClick = { showKlipyDialog = false }) {
                         Text(stringResource(R.string.cancel))
                     }
+                }
+            }
+        )
+    }
+
+    if (showSnippetsTriggerDialog) {
+        AlertDialog(
+            onDismissRequest = { showSnippetsTriggerDialog = false },
+            title = { Text(stringResource(R.string.snippets_trigger_dialog_title)) },
+            text = {
+                OutlinedTextField(
+                    value = pendingSnippetsTrigger,
+                    onValueChange = { value ->
+                        pendingSnippetsTrigger = value.takeLast(1)
+                    },
+                    label = { Text(stringResource(R.string.snippets_trigger_label)) },
+                    supportingText = {
+                        Text(stringResource(R.string.snippets_trigger_dialog_description))
+                    },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val normalized = pendingSnippetsTrigger.trim().take(1).ifEmpty { "!" }
+                    snippetsTrigger = normalized
+                    pendingSnippetsTrigger = normalized
+                    SettingsManager.setSnippetsTrigger(context, normalized)
+                    showSnippetsTriggerDialog = false
+                }) {
+                    Text(stringResource(R.string.snippets_save))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSnippetsTriggerDialog = false }) {
+                    Text(stringResource(R.string.auto_correct_cancel))
                 }
             }
         )

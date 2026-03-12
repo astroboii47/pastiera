@@ -55,6 +55,9 @@ import it.palsoftware.pastiera.gif.GifContentSender
 import it.palsoftware.pastiera.gif.KlipyGifResult
 import it.palsoftware.pastiera.emoji.EmojiShortcodeManager
 import it.palsoftware.pastiera.inputmethod.ui.EmojiShortcodePopup
+import it.palsoftware.pastiera.inputmethod.ui.SnippetPopup
+import it.palsoftware.pastiera.snippets.SnippetManager
+import it.palsoftware.pastiera.inputmethod.suggestions.SuggestionButtonHandler
 import android.content.pm.PackageManager
 import rikka.shizuku.Shizuku
 
@@ -92,6 +95,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
 
     // Keycode for the SYM key
     private val KEYCODE_SYM = 63
+    private val KEYCODE_SYM_SHORTCUT_ALIAS = KeyEvent.KEYCODE_F12
 
     // Single instance to show toasts without overlapping
     private var lastLayoutToastText: String? = null
@@ -149,10 +153,18 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     private var ctrlOneShot: Boolean
         get() = modifierStateController.ctrlOneShot
         set(value) { modifierStateController.ctrlOneShot = value }
+
+    private var ctrlLastReleaseTime: Long
+        get() = modifierStateController.ctrlLastReleaseTime
+        set(value) { modifierStateController.ctrlLastReleaseTime = value }
     
     private var altOneShot: Boolean
         get() = modifierStateController.altOneShot
         set(value) { modifierStateController.altOneShot = value }
+
+    private var altLastReleaseTime: Long
+        get() = modifierStateController.altLastReleaseTime
+        set(value) { modifierStateController.altLastReleaseTime = value }
     
     private var ctrlLatchFromNavMode: Boolean
         get() = modifierStateController.ctrlLatchFromNavMode
@@ -175,8 +187,12 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     
     // Constants
     private val DOUBLE_TAP_THRESHOLD = 500L
+    private val KEYMAPPER_MODIFIER_GUARD_MS = 40L
     private val SYM_TOGGLE_DEBOUNCE_MS = 300L
     private val CURSOR_UPDATE_DELAY = 50L
+    private val SHIFT_UNLATCH_REARM_GUARD_MS = 120L
+    private var suppressShiftUnlatchKeyUp = false
+    private var lastShiftUnlatchTime = 0L
     private val MULTI_TAP_TIMEOUT_MS = 400L
 
     // Modifier/nav/SYM controllers
@@ -195,8 +211,14 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     private lateinit var gifContentSender: GifContentSender
     private lateinit var emojiShortcodeManager: EmojiShortcodeManager
     private var emojiShortcodePopup: EmojiShortcodePopup? = null
+    private lateinit var snippetManager: SnippetManager
+    private var snippetPopup: SnippetPopup? = null
     private var latestSuggestions: List<String> = emptyList()
     private var clearAltOnSpaceEnabled: Boolean = false
+    private var showVariationsOverride: Boolean = false
+    private var shiftKeymapperGuardEnabled: Boolean = false
+    private var ctrlKeymapperGuardEnabled: Boolean = false
+    private var altKeymapperGuardEnabled: Boolean = false
     private var isLanguageSwitchInProgress: Boolean = false
     // Stato per ricordare se il nav mode era attivo prima di entrare in un campo di testo
     private var navModeWasActiveBeforeEditableField: Boolean = false
@@ -206,10 +228,13 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     private lateinit var trackpadGestureDetector: TrackpadGestureDetector
     private var modifierStateBeforeHold: it.palsoftware.pastiera.core.ModifierStateController.LogicalState? = null
     private var variationInteractedDuringHold: Boolean = false
+    private val recentModifierUpTimes = mutableMapOf<Int, Long>()
+    private val guardedModifierKeyUps = mutableSetOf<Int>()
     private var modifierDownTimes = mutableMapOf<Int, Long>()
     private var otherKeyInteractedDuringHold: Boolean = false
     private var shiftLayerLatched: Boolean = false
     private var altLayerLatched: Boolean = false
+    private var suppressAutoCapShiftUntilNonModifier: Boolean = false
     private var lastShiftTapUpTime: Long = 0L
     private var lastAltTapUpTime: Long = 0L
     private var lastSymToggleTime: Long = 0L
@@ -249,6 +274,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     private val symPage: Int
         get() = if (::symLayoutController.isInitialized) symLayoutController.currentSymPage() else 0
 
+    private fun isSymTriggerKey(keyCode: Int): Boolean {
+        return keyCode == KEYCODE_SYM || keyCode == KEYCODE_SYM_SHORTCUT_ALIAS
+    }
+
     private fun updateInputContextState(info: EditorInfo?) {
         inputContextState = InputContextState.fromEditorInfo(info)
     }
@@ -281,7 +310,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             keyCode == KeyEvent.KEYCODE_CTRL_RIGHT ||
             keyCode == KeyEvent.KEYCODE_ALT_LEFT ||
             keyCode == KeyEvent.KEYCODE_ALT_RIGHT ||
-            keyCode == KEYCODE_SYM
+            isSymTriggerKey(keyCode)
     }
     
     /**
@@ -361,6 +390,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         val suggestionsEnabled = SettingsManager.getSuggestionsEnabled(this)
         return SuggestionSettings(
             suggestionsEnabled = suggestionsEnabled,
+            nextWordPredictionsEnabled = SettingsManager.getNextWordPredictionsEnabled(this),
             accentMatching = SettingsManager.getAccentMatchingEnabled(this),
             autoReplaceOnSpaceEnter = SettingsManager.getAutoReplaceOnSpaceEnter(this),
             maxAutoReplaceDistance = SettingsManager.getMaxAutoReplaceDistance(this),
@@ -766,11 +796,29 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             else -> false
         }
     }
+
+    private fun isKeymapperGuardEnabledFor(keyCode: Int): Boolean {
+        return when (keyCode) {
+            KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT -> shiftKeymapperGuardEnabled
+            KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT -> ctrlKeymapperGuardEnabled
+            KeyEvent.KEYCODE_ALT_LEFT, KeyEvent.KEYCODE_ALT_RIGHT -> altKeymapperGuardEnabled
+            else -> false
+        }
+    }
+
+    private fun shouldIgnoreGuardedModifierPress(keyCode: Int, eventTime: Long): Boolean {
+        if (!isKeymapperGuardEnabledFor(keyCode)) return false
+        val lastUpTime = recentModifierUpTimes[keyCode] ?: return false
+        return eventTime > lastUpTime && eventTime - lastUpTime <= KEYMAPPER_MODIFIER_GUARD_MS
+    }
     
     override fun onCreate() {
         super.onCreate()
         prefs = getSharedPreferences("pastiera_prefs", Context.MODE_PRIVATE)
         clearAltOnSpaceEnabled = SettingsManager.getClearAltOnSpace(this)
+        shiftKeymapperGuardEnabled = SettingsManager.getShiftKeymapperGuardEnabled(this)
+        ctrlKeymapperGuardEnabled = SettingsManager.getCtrlKeymapperGuardEnabled(this)
+        altKeymapperGuardEnabled = SettingsManager.getAltKeymapperGuardEnabled(this)
 
         // Clear legacy nav mode notification since we now rely on the status icon only.
         NotificationHelper.cancelNavModeNotification(this)
@@ -814,8 +862,12 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         clipboardHistoryManager.onCreate()
         gifContentSender = GifContentSender(this)
         emojiShortcodeManager = EmojiShortcodeManager(this)
+        snippetManager = SnippetManager(this)
 
         candidatesBarController = CandidatesBarController(this, clipboardHistoryManager, assets, PhysicalKeyboardInputMethodService::class.java)
+        candidatesBarController.onSuggestionAccepted = { suggestion ->
+            suggestionController.onSuggestionAccepted(suggestion)
+        }
         candidatesBarController.onAddUserWord = { word ->
             if (shiftLayerLatched || altLayerLatched) {
                 shiftLayerLatched = false
@@ -842,6 +894,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         // Register listener for variation selection (both controllers)
         val variationListener = object : VariationButtonHandler.OnVariationSelectedListener {
             override fun onVariationSelected(variation: String) {
+                showVariationsOverride = false
                 val keepLayerLatchedAfterVariation =
                     SettingsManager.isStaticVariationBarLayerStickyEnabled(this@PhysicalKeyboardInputMethodService)
                 val hasLatchedLayer = shiftLayerLatched || altLayerLatched
@@ -860,6 +913,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
 
         // Register listener for cursor movement (both controllers)
         val cursorListener = {
+            showVariationsOverride = false
             if (shiftLayerLatched || altLayerLatched) {
                 shiftLayerLatched = false
                 altLayerLatched = false
@@ -915,6 +969,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             ensureInputViewCreated()
             // Toggle symbols as SYM page 2
             symLayoutController.openSymbolsPage()
+            updateStatusBarText()
+        }
+        candidatesBarController.onVariationsToggleRequested = {
+            showVariationsOverride = !showVariationsOverride
             updateStatusBarText()
         }
         candidatesBarController.onGifSelected = { result ->
@@ -1062,6 +1120,12 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                 }
             } else if (key == "clear_alt_on_space") {
                 clearAltOnSpaceEnabled = SettingsManager.getClearAltOnSpace(this)
+            } else if (key == "shift_keymapper_guard_enabled") {
+                shiftKeymapperGuardEnabled = SettingsManager.getShiftKeymapperGuardEnabled(this)
+            } else if (key == "ctrl_keymapper_guard_enabled") {
+                ctrlKeymapperGuardEnabled = SettingsManager.getCtrlKeymapperGuardEnabled(this)
+            } else if (key == "alt_keymapper_guard_enabled") {
+                altKeymapperGuardEnabled = SettingsManager.getAltKeymapperGuardEnabled(this)
             } else if (key != null && (key.startsWith("auto_correct_custom_") || key == "auto_correct_enabled_languages")) {
                 Log.d(TAG, "Auto-correction rules changed, reloading...")
                 // Reload auto-corrections (including new custom languages)
@@ -1449,6 +1513,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             shouldDisableAutoCapitalize = state.shouldDisableAutoCapitalize,
             shouldDisableDoubleSpaceToPeriod = state.shouldDisableDoubleSpaceToPeriod,
             shouldDisableVariations = state.shouldDisableVariations,
+            showVariationsOverride = showVariationsOverride,
             isEmailField = state.isEmailField,
             shiftLayerLatched = shiftLayerLatched,
             altLayerLatched = altLayerLatched,
@@ -1565,6 +1630,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         updateInputContextState(info)
         initializeInputContext(restarting)
         suggestionController.onContextReset()
+        isInputViewActive = inputContextState.isEditable
         
         // Read word at cursor immediately when entering a populated text field
         if (!inputContextState.shouldDisableSuggestions) {
@@ -1636,9 +1702,9 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
-        isInputViewActive = false
         stopClipboardCleanupTimer()
         if (finishingInput) {
+            isInputViewActive = false
             multiTapController.cancelAll()
             resetModifierStates(preserveNavMode = true)
             suggestionController.onContextReset()
@@ -2083,6 +2149,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         
         if (cursorPositionChanged && collapsedSelection && !shouldSkipForCommit) {
             checkAndShowEmojiShortcode()
+            checkAndShowSnippetShortcode()
             if ((symPage == 4 || symPage == 5) && ::candidatesBarController.isInitialized) {
                 // User likely tapped/moved cursor in the target app text field: return hardware typing to app.
                 candidatesBarController.disableEmojiPickerSearchInputCapture()
@@ -2108,19 +2175,21 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         }
         
         // Check auto-capitalization on selection change (if auto-cap enabled)
-        AutoCapitalizeHelper.checkAutoCapitalizeOnSelectionChange(
-            this,
-            currentInputConnection,
-            state.shouldDisableAutoCapitalize,
-            oldSelStart,
-            oldSelEnd,
-            newSelStart,
-            newSelEnd,
-            enableShift = { modifierStateController.requestShiftOneShotFromAutoCap() },
-            disableShift = { modifierStateController.consumeShiftOneShot() },
-            onUpdateStatusBar = { updateStatusBarText() },
-            inputContextState = state
-        )
+        if (!suppressAutoCapShiftUntilNonModifier) {
+            AutoCapitalizeHelper.checkAutoCapitalizeOnSelectionChange(
+                this,
+                currentInputConnection,
+                state.shouldDisableAutoCapitalize,
+                oldSelStart,
+                oldSelEnd,
+                newSelStart,
+                newSelEnd,
+                enableShift = { modifierStateController.requestShiftOneShotFromAutoCap() },
+                disableShift = { modifierStateController.consumeShiftOneShot() },
+                onUpdateStatusBar = { updateStatusBarText() },
+                inputContextState = state
+            )
+        }
 
         if (!collapsedSelection) {
             emojiShortcodePopup?.dismiss()
@@ -2129,7 +2198,62 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
 
     private fun remapHardwareEvent(keyCode: Int, event: KeyEvent?): Pair<Int, KeyEvent?> {
         val remapped = DeviceSpecific.remapHardwareKeyEvent(keyCode, event)
-        return remapped.keyCode to remapped.event
+        return remapped.keyCode to sanitizeModifierMetaState(remapped.keyCode, remapped.event)
+    }
+
+    private fun sanitizeModifierMetaState(keyCode: Int, event: KeyEvent?): KeyEvent? {
+        val keyEvent = event ?: return null
+        val ctrlActive =
+            ctrlPressed ||
+                ctrlPhysicallyPressed ||
+                ctrlLatchActive ||
+                ctrlOneShot ||
+                ctrlLatchFromNavMode
+        val altActive =
+            altPressed ||
+                altPhysicallyPressed ||
+                altLatchActive ||
+                altOneShot
+        val shiftActive =
+            shiftPressed ||
+                shiftPhysicallyPressed ||
+                shiftOneShot ||
+                capsLockEnabled
+
+        val preserveCtrlMeta =
+            ctrlActive || keyCode == KeyEvent.KEYCODE_CTRL_LEFT || keyCode == KeyEvent.KEYCODE_CTRL_RIGHT
+        val preserveAltMeta =
+            altActive || keyCode == KeyEvent.KEYCODE_ALT_LEFT || keyCode == KeyEvent.KEYCODE_ALT_RIGHT
+        val preserveShiftMeta =
+            shiftActive || keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT
+
+        var normalizedMetaState = keyEvent.metaState
+        if (!preserveCtrlMeta) {
+            normalizedMetaState = normalizedMetaState and KeyEvent.META_CTRL_MASK.inv()
+        }
+        if (!preserveAltMeta) {
+            normalizedMetaState = normalizedMetaState and KeyEvent.META_ALT_MASK.inv()
+        }
+        if (!preserveShiftMeta) {
+            normalizedMetaState = normalizedMetaState and KeyEvent.META_SHIFT_MASK.inv()
+        }
+
+        return if (normalizedMetaState == keyEvent.metaState) {
+            keyEvent
+        } else {
+            KeyEvent(
+                keyEvent.downTime,
+                keyEvent.eventTime,
+                keyEvent.action,
+                keyEvent.keyCode,
+                keyEvent.repeatCount,
+                normalizedMetaState,
+                keyEvent.deviceId,
+                keyEvent.scanCode,
+                keyEvent.flags,
+                keyEvent.source
+            )
+        }
     }
 
     override fun onKeyLongPress(keyCode_: Int, event_: KeyEvent?): Boolean {
@@ -2174,7 +2298,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             hasEditableField &&
             symPage == 4 &&
             keyCode != KeyEvent.KEYCODE_BACK &&
-            keyCode != KEYCODE_SYM &&
+            !isSymTriggerKey(keyCode) &&
             ::candidatesBarController.isInitialized &&
             candidatesBarController.handleEmojiPickerSearchKeyDown(event)
         ) {
@@ -2185,7 +2309,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             hasEditableField &&
             symPage == 5 &&
             keyCode != KeyEvent.KEYCODE_BACK &&
-            keyCode != KEYCODE_SYM &&
+            !isSymTriggerKey(keyCode) &&
             ::candidatesBarController.isInitialized &&
             candidatesBarController.handleGifPickerSearchKeyDown(event)
         ) {
@@ -2205,7 +2329,20 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             }
         }
 
-        if (hasEditableField && keyCode == KEYCODE_SYM && event?.repeatCount == 0) {
+        if (snippetPopup?.isShowing() == true) {
+            if (keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                snippetPopup?.dismiss()
+                if (keyCode == KeyEvent.KEYCODE_DEL) {
+                    return false
+                }
+                return true
+            }
+            if (snippetPopup?.handlePhysicalKey(keyCode, event) == true) {
+                return true
+            }
+        }
+
+        if (hasEditableField && isSymTriggerKey(keyCode) && event?.repeatCount == 0) {
             symTogglePendingOnKeyUp = true
             symChordUsedSinceKeyDown = false
         }
@@ -2213,7 +2350,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         if (
             hasEditableField &&
             symTogglePendingOnKeyUp &&
-            keyCode != KEYCODE_SYM &&
+            !isSymTriggerKey(keyCode) &&
             event?.repeatCount == 0 &&
             !isPureModifierKey(keyCode)
         ) {
@@ -2251,10 +2388,67 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             keyCode == KeyEvent.KEYCODE_ALT_LEFT ||
             keyCode == KeyEvent.KEYCODE_ALT_RIGHT
 
+        if (
+            event?.repeatCount == 0 &&
+            isModifierKey &&
+            shouldIgnoreGuardedModifierPress(keyCode, event.eventTime)
+        ) {
+            guardedModifierKeyUps.add(keyCode)
+            return true
+        }
+
         if (event?.repeatCount == 0 && isModifierKey) {
+            val eventTime = event.eventTime
+            if (
+                (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) &&
+                modifierStateController.isShiftOneShotFromAutoCap &&
+                !shiftPressed &&
+                !shiftPhysicallyPressed
+            ) {
+                modifierStateController.clearShiftState(resetPressedState = true)
+                suppressShiftUnlatchKeyUp = true
+                suppressAutoCapShiftUntilNonModifier = true
+                shiftLayerLatched = false
+                lastShiftTapUpTime = 0L
+                modifierStateBeforeHold = null
+                variationInteractedDuringHold = false
+                otherKeyInteractedDuringHold = false
+                modifierDownTimes.remove(keyCode)
+                updateStatusBarText()
+                return true
+            }
+            if (
+                (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) &&
+                lastShiftUnlatchTime > 0L &&
+                eventTime - lastShiftUnlatchTime <= SHIFT_UNLATCH_REARM_GUARD_MS
+            ) {
+                Log.d(TAG, "Ignoring Shift re-arm within unlatch guard window")
+                return true
+            }
+            if (
+                (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) &&
+                capsLockEnabled &&
+                !shiftPressed &&
+                !shiftPhysicallyPressed
+            ) {
+                Log.d(TAG, "Direct Shift unlatch on keyDown: caps=$capsLockEnabled oneShot=$shiftOneShot physical=$shiftPhysicallyPressed layer=$shiftLayerLatched")
+                modifierStateController.clearShiftState(resetPressedState = true)
+                suppressShiftUnlatchKeyUp = true
+                lastShiftUnlatchTime = eventTime
+                shiftLayerLatched = false
+                lastShiftTapUpTime = 0L
+                modifierStateBeforeHold = null
+                variationInteractedDuringHold = false
+                otherKeyInteractedDuringHold = false
+                modifierDownTimes.remove(keyCode)
+                updateStatusBarText()
+                return true
+            }
+
             // Pressing a latched key again cancels the visual latch and restores logical state.
             if ((keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) && shiftLayerLatched) {
                 shiftLayerLatched = false
+                suppressAutoCapShiftUntilNonModifier = true
                 lastShiftTapUpTime = 0L
                 // Tapping SHIFT while the visual Shift layer is latched should fully disable Shift.
                 // Restoring the pre-hold snapshot here can resurrect stale one-shot/caps state.
@@ -2279,6 +2473,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             otherKeyInteractedDuringHold = false
             modifierDownTimes[keyCode] = event.eventTime
         } else if (!isModifierKey && event?.repeatCount == 0) {
+            showVariationsOverride = false
+            suppressAutoCapShiftUntilNonModifier = false
             otherKeyInteractedDuringHold = true
             lastShiftTapUpTime = 0L
             lastAltTapUpTime = 0L
@@ -2395,8 +2591,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         if (!isInputViewShown && isInputViewActive) {
             ensureInputViewCreated()
         }
-        val altActiveNow = event?.isAltPressed == true || altLatchActive || altOneShot
-        val ctrlActiveNow = event?.isCtrlPressed == true ||
+        val altActiveNow = altPressed || altPhysicallyPressed || altLatchActive || altOneShot
+        val ctrlActiveNow =
             ctrlPressed ||
             ctrlPhysicallyPressed ||
             ctrlLatchActive ||
@@ -2433,12 +2629,14 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                 ) { updateStatusBarText() }
             ) {
                 checkAndShowEmojiShortcode()
+                checkAndShowSnippetShortcode()
                 return true
             }
         }
 
         if (!altActiveNow && !ctrlActiveNow && handleVietnameseTelexKey(keyCode, event, ic)) {
             checkAndShowEmojiShortcode()
+            checkAndShowSnippetShortcode()
             return true
         }
         
@@ -2517,11 +2715,27 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         val hasEditableField = ic != null && inputType != EditorInfo.TYPE_NULL
         val (keyCode, event) = remapHardwareEvent(keyCode_, event_)
 
+        if (guardedModifierKeyUps.remove(keyCode)) {
+            return true
+        }
+
+        if (
+            (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) &&
+            suppressShiftUnlatchKeyUp
+        ) {
+            Log.d(TAG, "Suppressing Shift keyUp after direct unlatch")
+            suppressShiftUnlatchKeyUp = false
+            modifierDownTimes.remove(keyCode)
+            variationInteractedDuringHold = false
+            otherKeyInteractedDuringHold = false
+            return true
+        }
+
         if (
             hasEditableField &&
             symPage == 4 &&
             keyCode != KeyEvent.KEYCODE_BACK &&
-            keyCode != KEYCODE_SYM &&
+            !isSymTriggerKey(keyCode) &&
             ::candidatesBarController.isInitialized &&
             candidatesBarController.shouldConsumeEmojiPickerSearchKeyUp(event)
         ) {
@@ -2532,7 +2746,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             hasEditableField &&
             symPage == 5 &&
             keyCode != KeyEvent.KEYCODE_BACK &&
-            keyCode != KEYCODE_SYM &&
+            !isSymTriggerKey(keyCode) &&
             ::candidatesBarController.isInitialized &&
             candidatesBarController.shouldConsumeGifPickerSearchKeyUp(event)
         ) {
@@ -2541,7 +2755,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         
         // If NO editable field is active, handle ONLY nav mode Ctrl release
         if (!hasEditableField) {
-            if (keyCode == KEYCODE_SYM) {
+            if (isSymTriggerKey(keyCode)) {
                 symTogglePendingOnKeyUp = false
                 symChordUsedSinceKeyDown = false
             }
@@ -2571,6 +2785,37 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         
         // Always notify the tracker (even when the event is consumed)
         KeyboardEventTracker.notifyKeyEvent(keyCode, event, "KEY_UP")
+
+        if (
+            keyCode == KeyEvent.KEYCODE_SHIFT_LEFT ||
+            keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT ||
+            keyCode == KeyEvent.KEYCODE_CTRL_LEFT ||
+            keyCode == KeyEvent.KEYCODE_CTRL_RIGHT ||
+            keyCode == KeyEvent.KEYCODE_ALT_LEFT ||
+            keyCode == KeyEvent.KEYCODE_ALT_RIGHT
+        ) {
+            recentModifierUpTimes[keyCode] = event?.eventTime ?: System.currentTimeMillis()
+        }
+
+        if (
+            (keyCode == KeyEvent.KEYCODE_CTRL_LEFT || keyCode == KeyEvent.KEYCODE_CTRL_RIGHT) &&
+            modifierStateController.consumeSuppressedCtrlKeyUp()
+        ) {
+            modifierDownTimes.remove(keyCode)
+            variationInteractedDuringHold = false
+            otherKeyInteractedDuringHold = false
+            return true
+        }
+
+        if (
+            (keyCode == KeyEvent.KEYCODE_ALT_LEFT || keyCode == KeyEvent.KEYCODE_ALT_RIGHT) &&
+            modifierStateController.consumeSuppressedAltKeyUp()
+        ) {
+            modifierDownTimes.remove(keyCode)
+            variationInteractedDuringHold = false
+            otherKeyInteractedDuringHold = false
+            return true
+        }
         
         // Handle Shift release for double-tap
         if (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
@@ -2578,7 +2823,6 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                 val downTime = modifierDownTimes[keyCode] ?: 0L
                 val holdDuration = if (downTime > 0) event?.eventTime?.minus(downTime) ?: 0L else 0L
                 val isLongHold = holdDuration > 300L
-                val stickyEnabled = SettingsManager.isStaticVariationBarLayerStickyEnabled(this)
                 val isIntentionalHold = variationInteractedDuringHold || (isLongHold && !otherKeyInteractedDuringHold)
 
                 if (isIntentionalHold) {
@@ -2597,19 +2841,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                     if (result.shouldUpdateStatusBar) {
                         updateStatusBarText()
                     }
-                    val isQuickTap = holdDuration < 300L && !variationInteractedDuringHold && !otherKeyInteractedDuringHold
-                    if (stickyEnabled && isQuickTap) {
-                        val now = event?.eventTime ?: System.currentTimeMillis()
-                        if (lastShiftTapUpTime > 0L && now - lastShiftTapUpTime <= DOUBLE_TAP_THRESHOLD) {
-                            shiftLayerLatched = true
-                            lastShiftTapUpTime = 0L
-                            updateStatusBarText()
-                        } else {
-                            lastShiftTapUpTime = now
-                        }
-                    } else {
-                        lastShiftTapUpTime = 0L
-                    }
+                    shiftLayerLatched = capsLockEnabled
+                    lastShiftTapUpTime = 0L
                 }
                 variationInteractedDuringHold = false
                 otherKeyInteractedDuringHold = false
@@ -2658,7 +2891,6 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                 val downTime = modifierDownTimes[keyCode] ?: 0L
                 val holdDuration = if (downTime > 0) event?.eventTime?.minus(downTime) ?: 0L else 0L
                 val isLongHold = holdDuration > 300L
-                val stickyEnabled = SettingsManager.isStaticVariationBarLayerStickyEnabled(this)
                 val isIntentionalHold = variationInteractedDuringHold || (isLongHold && !otherKeyInteractedDuringHold)
 
                 if (isIntentionalHold) {
@@ -2677,19 +2909,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                     if (result.shouldUpdateStatusBar) {
                         updateStatusBarText()
                     }
-                    val isQuickTap = holdDuration < 300L && !variationInteractedDuringHold && !otherKeyInteractedDuringHold
-                    if (stickyEnabled && isQuickTap) {
-                        val now = event?.eventTime ?: System.currentTimeMillis()
-                        if (lastAltTapUpTime > 0L && now - lastAltTapUpTime <= DOUBLE_TAP_THRESHOLD) {
-                            altLayerLatched = true
-                            lastAltTapUpTime = 0L
-                            updateStatusBarText()
-                        } else {
-                            lastAltTapUpTime = now
-                        }
-                    } else {
-                        lastAltTapUpTime = 0L
-                    }
+                    altLayerLatched = altLatchActive
+                    lastAltTapUpTime = 0L
                 }
                 variationInteractedDuringHold = false
                 otherKeyInteractedDuringHold = false
@@ -2699,7 +2920,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         }
         
         // Toggle SYM layout on key release only when SYM was tapped alone.
-        if (keyCode == KEYCODE_SYM) {
+        if (isSymTriggerKey(keyCode)) {
             if (symTogglePendingOnKeyUp && !symChordUsedSinceKeyDown) {
                 val eventTime = event?.eventTime ?: System.currentTimeMillis()
                 if (eventTime - lastSymToggleTime >= SYM_TOGGLE_DEBOUNCE_MS) {
@@ -2732,6 +2953,14 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
 
         val inputConnection = currentInputConnection ?: return
         val textBeforeCursor = inputConnection.getTextBeforeCursor(100, 0)?.toString() ?: return
+        val completedShortcode = emojiShortcodeManager.extractCompletedShortcode(textBeforeCursor)
+        if (completedShortcode != null) {
+            val character = emojiShortcodeManager.lookupExactShortcode(completedShortcode)
+            if (character != null && shortcodeCategoryEnabled(character, emojiEnabled, symbolEnabled)) {
+                replaceCompletedShortcodeWithEmoji(character, completedShortcode)
+                return
+            }
+        }
         val (shortcode, _) = emojiShortcodeManager.extractCurrentShortcode(textBeforeCursor) ?: run {
             emojiShortcodePopup?.dismiss()
             return
@@ -2770,6 +2999,66 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         }
     }
 
+    private fun checkAndShowSnippetShortcode() {
+        if (!::snippetManager.isInitialized) return
+        if (!SettingsManager.getSnippetsEnabled(this)) {
+            snippetPopup?.dismiss()
+            return
+        }
+
+        val inputConnection = currentInputConnection ?: return
+        val trigger = SettingsManager.getSnippetsTrigger(this).firstOrNull() ?: '!'
+        val textBeforeCursor = inputConnection.getTextBeforeCursor(120, 0)?.toString() ?: return
+
+        val completed = snippetManager.extractCompletedSnippet(textBeforeCursor, trigger)
+        if (completed != null) {
+            val value = snippetManager.lookupExactSnippet(completed.shortcut)
+            if (value != null) {
+                replaceCompletedSnippetWithValue(value, completed.shortcut, completed.boundary, trigger)
+                return
+            }
+        }
+
+        val (shortcut, _) = snippetManager.extractCurrentSnippet(textBeforeCursor, trigger) ?: run {
+            snippetPopup?.dismiss()
+            return
+        }
+
+        val suggestions = snippetManager.searchSnippets(shortcut, 10)
+        if (suggestions.isEmpty()) {
+            snippetPopup?.dismiss()
+            return
+        }
+
+        val anchorView = window?.window?.decorView ?: return
+        if (snippetPopup?.isShowing() == true) {
+            snippetPopup?.updateSuggestions(suggestions)
+        } else {
+            snippetPopup = SnippetPopup(
+                context = this,
+                trigger = trigger,
+                onSnippetSelected = { value, selectedShortcut ->
+                    replaceSnippetWithValue(value, selectedShortcut, trigger)
+                },
+                onDismiss = {
+                    snippetPopup = null
+                }
+            ).also { popup ->
+                popup.show(anchorView, suggestions)
+            }
+        }
+    }
+
+    private fun shortcodeCategoryEnabled(character: String, emojiEnabled: Boolean, symbolEnabled: Boolean): Boolean {
+        val codePoint = character.codePointAt(0)
+        return when {
+            emojiEnabled && symbolEnabled -> true
+            emojiEnabled -> character.length > 1 || codePoint > 0x1F000
+            symbolEnabled -> codePoint < 0x1F000 || codePoint > 0x1FFFF
+            else -> false
+        }
+    }
+
     private fun replaceShortcodeWithEmoji(emoji: String, shortcode: String) {
         val inputConnection = currentInputConnection ?: return
         val textBeforeCursor = inputConnection.getTextBeforeCursor(100, 0)?.toString() ?: return
@@ -2785,20 +3074,67 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         emojiShortcodePopup?.dismiss()
     }
 
+    private fun replaceSnippetWithValue(value: String, shortcut: String, trigger: Char) {
+        val inputConnection = currentInputConnection ?: return
+        val textBeforeCursor = inputConnection.getTextBeforeCursor(160, 0)?.toString() ?: return
+        val (_, triggerIndex) = snippetManager.extractCurrentSnippet(textBeforeCursor, trigger) ?: return
+        val charsToDelete = textBeforeCursor.length - triggerIndex
+
+        inputConnection.beginBatchEdit()
+        inputConnection.deleteSurroundingText(charsToDelete, 0)
+        markSelectionUpdateSkipAfterCommit()
+        inputConnection.commitText(value, 1)
+        inputConnection.endBatchEdit()
+        snippetPopup?.dismiss()
+    }
+
+    private fun replaceCompletedSnippetWithValue(value: String, shortcut: String, boundary: String, trigger: Char) {
+        val inputConnection = currentInputConnection ?: return
+        val textBeforeCursor = inputConnection.getTextBeforeCursor(160, 0)?.toString() ?: return
+        val completed = snippetManager.extractCompletedSnippet(textBeforeCursor, trigger) ?: return
+        if (!completed.shortcut.equals(shortcut, ignoreCase = true) || completed.boundary != boundary) return
+        val charsToDelete = completed.shortcut.length + boundary.length + 1
+
+        inputConnection.beginBatchEdit()
+        inputConnection.deleteSurroundingText(charsToDelete, 0)
+        markSelectionUpdateSkipAfterCommit()
+        inputConnection.commitText(value + boundary, 1)
+        inputConnection.endBatchEdit()
+        snippetPopup?.dismiss()
+    }
+
+    private fun replaceCompletedShortcodeWithEmoji(emoji: String, shortcode: String) {
+        val inputConnection = currentInputConnection ?: return
+        val textBeforeCursor = inputConnection.getTextBeforeCursor(100, 0)?.toString() ?: return
+        val token = ":$shortcode:"
+        if (!textBeforeCursor.endsWith(token)) return
+
+        inputConnection.beginBatchEdit()
+        inputConnection.deleteSurroundingText(token.length, 0)
+        markSelectionUpdateSkipAfterCommit()
+        inputConnection.commitText(emoji, 1)
+        inputConnection.endBatchEdit()
+        emojiShortcodePopup?.dismiss()
+    }
+
     private fun sendGifResult(result: KlipyGifResult) {
         val inputConnection = currentInputConnection
         val editorInfo = currentInputEditorInfo
         if (inputConnection == null) {
             gifContentSender.copyFallbackLink(result)
-            android.widget.Toast.makeText(this, getString(R.string.gif_picker_link_copied), android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(
+                this,
+                getString(R.string.gif_picker_link_copied, result.mediaType.singularName),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
             return
         }
 
         CoroutineScope(Dispatchers.Main).launch {
-            val committed = if (gifContentSender.supportsGifCommit(editorInfo)) {
+            val committed = if (gifContentSender.supportsMediaCommit(editorInfo, result)) {
                 runCatching {
                     val preparedGif = withContext(Dispatchers.IO) {
-                        gifContentSender.prepareGif(result)
+                        gifContentSender.prepareMedia(result)
                     }
                     val nonNullEditorInfo = editorInfo ?: return@runCatching false
                     gifContentSender.commitPreparedGif(preparedGif, inputConnection, nonNullEditorInfo)
@@ -2810,16 +3146,24 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             if (committed) {
                 android.widget.Toast.makeText(
                     this@PhysicalKeyboardInputMethodService,
-                    getString(R.string.gif_picker_sent),
+                    getString(R.string.gif_picker_sent, result.mediaType.singularName),
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
             } else {
-                gifContentSender.insertFallbackLink(result, inputConnection)
-                android.widget.Toast.makeText(
-                    this@PhysicalKeyboardInputMethodService,
-                    getString(R.string.gif_picker_fallback_link_inserted),
-                    android.widget.Toast.LENGTH_SHORT
-                ).show()
+                if (gifContentSender.hasTextFallback(result)) {
+                    gifContentSender.insertFallbackLink(result, inputConnection)
+                    android.widget.Toast.makeText(
+                        this@PhysicalKeyboardInputMethodService,
+                        getString(R.string.gif_picker_fallback_link_inserted, result.mediaType.singularName),
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    android.widget.Toast.makeText(
+                        this@PhysicalKeyboardInputMethodService,
+                        getString(R.string.gif_picker_not_supported, result.mediaType.singularName),
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         }
     }
@@ -2986,61 +3330,12 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
 
             Log.d(TAG, "Accepting suggestion '$suggestion' from third=$third (index=$suggestionIndex)")
 
-            // Use the same logic as SuggestionButtonHandler
-            val before = ic.getTextBeforeCursor(64, 0)?.toString().orEmpty()
-            val after = ic.getTextAfterCursor(64, 0)?.toString().orEmpty()
-            fun isBoundaryChar(ch: Char, prev: Char?, next: Char?): Boolean {
-                return it.palsoftware.pastiera.core.Punctuation.isWordBoundary(ch, prev, next)
-            }
-
-            // Find start of word in 'before'
-            var start = before.length
-            while (start > 0) {
-                val ch = before[start - 1]
-                val prev = before.getOrNull(start - 2)
-                val next = before.getOrNull(start)
-                if (!isBoundaryChar(ch, prev, next)) {
-                    start--
-                    continue
-                }
-                break
-            }
-
-            // Find end of word in 'after'
-            var end = 0
-            while (end < after.length) {
-                val ch = after[end]
-                val prev = if (end == 0) before.lastOrNull() else after[end - 1]
-                val next = after.getOrNull(end + 1)
-                if (!isBoundaryChar(ch, prev, next)) {
-                    end++
-                    continue
-                }
-                break
-            }
-
-            val wordBeforeCursor = before.substring(start)
-            val wordAfterCursor = after.substring(0, end)
-            val currentWord = wordBeforeCursor + wordAfterCursor
-
-            val deleteBefore = wordBeforeCursor.length
-            val deleteAfter = wordAfterCursor.length
-            val replacement = it.palsoftware.pastiera.core.suggestions.CasingHelper.applyCasing(
-                suggestion, currentWord, forceLeadingCapital
+            SuggestionButtonHandler.commitSuggestion(
+                inputConnection = ic,
+                suggestion = suggestion,
+                forceLeadingCapital = forceLeadingCapital
             )
-            val shouldAppendSpace = !replacement.endsWith("'")
-
-            ic.deleteSurroundingText(deleteBefore, deleteAfter)
-            val textToCommit = if (shouldAppendSpace) "$replacement " else replacement
-            ic.commitText(textToCommit, 1)
-
-            if (shouldAppendSpace) {
-                it.palsoftware.pastiera.core.AutoSpaceTracker.markAutoSpace()
-            }
-
-            // CRITICAL FIX: Reset tracker after accepting suggestion to prevent duplicate letters
-            // The cursor debounce can cause tracker to be out of sync when user types quickly after accepting
-            suggestionController.onContextReset()
+            suggestionController.onSuggestionAccepted(suggestion)
             NotificationHelper.triggerHapticFeedback(this)
             Log.d(TAG, "Suggestion '$suggestion' inserted successfully")
         }

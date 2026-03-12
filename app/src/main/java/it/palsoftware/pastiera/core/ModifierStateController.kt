@@ -12,6 +12,12 @@ enum class ShiftState { OFF, ONE_SHOT, CAPS }
 class ModifierStateController(
     private val doubleTapThreshold: Long
 ) {
+    private enum class ShiftOneShotSource {
+        NONE,
+        MANUAL,
+        AUTO_CAP
+    }
+
     private val modifierKeyHandler = ModifierKeyHandler(doubleTapThreshold)
     private var lastKeyWasModifier = false
     private var lastModifierKeyCode: Int = 0
@@ -26,9 +32,12 @@ class ModifierStateController(
 
         fun tap(
             now: Long = System.currentTimeMillis(),
-            isConsecutiveTap: Boolean
+            isConsecutiveTap: Boolean,
+            allowDoubleTapLatch: Boolean = true
         ): ShiftState {
-            val doubleTap = isConsecutiveTap && now - lastTapTime < doubleTapThreshold
+            val doubleTap = allowDoubleTapLatch &&
+                isConsecutiveTap &&
+                now - lastTapTime < doubleTapThreshold
             lastTapTime = now
             state = when {
                 doubleTap -> if (state == ShiftState.CAPS) ShiftState.OFF else ShiftState.CAPS
@@ -75,6 +84,9 @@ class ModifierStateController(
     private val shiftStateMachine = ShiftStateMachine(doubleTapThreshold)
     private var shiftPressedFlag = false
     private var shiftPhysicallyPressedFlag = false
+    private var shiftOneShotSource: ShiftOneShotSource = ShiftOneShotSource.NONE
+    private var suppressCtrlKeyUp = false
+    private var suppressAltKeyUp = false
 
     private val ctrlState = ModifierKeyHandler.CtrlState()
     private val altState = ModifierKeyHandler.AltState()
@@ -87,6 +99,11 @@ class ModifierStateController(
     }
 
     fun registerNonModifierKey() {
+        lastKeyWasModifier = false
+        lastModifierKeyCode = 0
+    }
+
+    fun clearModifierTapTracking() {
         lastKeyWasModifier = false
         lastModifierKeyCode = 0
     }
@@ -126,6 +143,7 @@ class ModifierStateController(
 
     fun restoreLogicalState(captured: LogicalState) {
         shiftStateMachine.restore(captured.shiftState)
+        shiftOneShotSource = if (captured.shiftState == ShiftState.ONE_SHOT) ShiftOneShotSource.MANUAL else ShiftOneShotSource.NONE
         ctrlState.oneShot = captured.ctrlOneShot
         ctrlState.latchActive = captured.ctrlLatchActive
         ctrlState.latchFromNavMode = captured.ctrlLatchFromNavMode
@@ -135,6 +153,10 @@ class ModifierStateController(
 
     val shiftState: ShiftState
         get() = shiftStateMachine.state
+
+    val isShiftOneShotFromAutoCap: Boolean
+        get() = shiftStateMachine.state == ShiftState.ONE_SHOT &&
+            shiftOneShotSource == ShiftOneShotSource.AUTO_CAP
 
     var capsLockEnabled: Boolean
         get() = shiftStateMachine.state == ShiftState.CAPS
@@ -153,8 +175,10 @@ class ModifierStateController(
         set(value) {
             if (value) {
                 shiftStateMachine.requestOneShot()
+                shiftOneShotSource = ShiftOneShotSource.MANUAL
             } else {
                 shiftStateMachine.consumeOneShot()
+                shiftOneShotSource = ShiftOneShotSource.NONE
             }
         }
 
@@ -182,6 +206,12 @@ class ModifierStateController(
         get() = ctrlState.lastReleaseTime
         set(value) { ctrlState.lastReleaseTime = value }
 
+    fun consumeSuppressedCtrlKeyUp(): Boolean {
+        if (!suppressCtrlKeyUp) return false
+        suppressCtrlKeyUp = false
+        return true
+    }
+
     var altLatchActive: Boolean
         get() = altState.latchActive
         set(value) { altState.latchActive = value }
@@ -197,6 +227,16 @@ class ModifierStateController(
     var altOneShot: Boolean
         get() = altState.oneShot
         set(value) { altState.oneShot = value }
+
+    var altLastReleaseTime: Long
+        get() = altState.lastReleaseTime
+        set(value) { altState.lastReleaseTime = value }
+
+    fun consumeSuppressedAltKeyUp(): Boolean {
+        if (!suppressAltKeyUp) return false
+        suppressAltKeyUp = false
+        return true
+    }
 
     fun snapshot(): Snapshot {
         return Snapshot(
@@ -226,9 +266,24 @@ class ModifierStateController(
 
         shiftPhysicallyPressedFlag = true
         shiftPressedFlag = true
+        if (shiftStateMachine.state == ShiftState.ONE_SHOT && shiftOneShotSource == ShiftOneShotSource.AUTO_CAP) {
+            shiftStateMachine.consumeOneShot()
+            shiftOneShotSource = ShiftOneShotSource.NONE
+            clearModifierTapTracking()
+            return ModifierKeyHandler.ModifierKeyResult(
+                shouldUpdateStatusBar = true,
+                shouldRefreshStatusBar = true
+            )
+        }
         val previous = shiftStateMachine.state
         val isConsecutiveTap = registerModifierTap(keyCode)
-        val current = shiftStateMachine.tap(isConsecutiveTap = isConsecutiveTap)
+        val current = shiftStateMachine.tap(
+            isConsecutiveTap = isConsecutiveTap
+        )
+        shiftOneShotSource = when (current) {
+            ShiftState.ONE_SHOT -> ShiftOneShotSource.MANUAL
+            else -> ShiftOneShotSource.NONE
+        }
         val changed = previous != current
         return ModifierKeyHandler.ModifierKeyResult(
             shouldUpdateStatusBar = changed,
@@ -256,19 +311,29 @@ class ModifierStateController(
         if (ctrlPressed) {
             return ModifierKeyHandler.ModifierKeyResult()
         }
+        val hadToggleState = ctrlState.latchActive || ctrlState.oneShot
         val isConsecutiveTap = registerModifierTap(keyCode)
-        val result = modifierKeyHandler.handleCtrlKeyDown(
+        val baseResult = modifierKeyHandler.handleCtrlKeyDown(
             keyCode,
             ctrlState,
             isInputViewActive,
             isConsecutiveTap = isConsecutiveTap,
+            allowDoubleTapLatch = true,
             onNavModeDeactivated
         )
-        ctrlPressed = true
-        return result
+        val toggledOff = hadToggleState && !ctrlState.latchActive && !ctrlState.oneShot
+        suppressCtrlKeyUp = toggledOff
+        ctrlPressed = !toggledOff
+        ctrlPhysicallyPressed = !toggledOff
+        return if (toggledOff) {
+            baseResult.copy(shouldConsume = true)
+        } else {
+            baseResult
+        }
     }
 
     fun handleCtrlKeyUp(keyCode: Int): ModifierKeyHandler.ModifierKeyResult {
+        suppressCtrlKeyUp = false
         val result = modifierKeyHandler.handleCtrlKeyUp(keyCode, ctrlState)
         ctrlPressed = false
         return result
@@ -278,17 +343,27 @@ class ModifierStateController(
         if (altPressed) {
             return ModifierKeyHandler.ModifierKeyResult()
         }
+        val hadToggleState = altState.latchActive || altState.oneShot
         val isConsecutiveTap = registerModifierTap(keyCode)
-        val result = modifierKeyHandler.handleAltKeyDown(
+        val baseResult = modifierKeyHandler.handleAltKeyDown(
             keyCode,
             altState,
-            isConsecutiveTap = isConsecutiveTap
+            isConsecutiveTap = isConsecutiveTap,
+            allowDoubleTapLatch = true
         )
-        altPressed = true
-        return result
+        val toggledOff = hadToggleState && !altState.latchActive && !altState.oneShot
+        suppressAltKeyUp = toggledOff
+        altPressed = !toggledOff
+        altPhysicallyPressed = !toggledOff
+        return if (toggledOff) {
+            baseResult.copy(shouldConsume = true)
+        } else {
+            baseResult
+        }
     }
 
     fun handleAltKeyUp(keyCode: Int): ModifierKeyHandler.ModifierKeyResult {
+        suppressAltKeyUp = false
         val result = modifierKeyHandler.handleAltKeyUp(keyCode, altState)
         altPressed = false
         return result
@@ -300,6 +375,7 @@ class ModifierStateController(
      */
     fun clearShiftState(resetPressedState: Boolean = false) {
         shiftStateMachine.reset()
+        shiftOneShotSource = ShiftOneShotSource.NONE
         if (resetPressedState) {
             shiftPressedFlag = false
             shiftPhysicallyPressedFlag = false
@@ -314,6 +390,7 @@ class ModifierStateController(
         altState.latchActive = false
         altState.oneShot = false
         altState.lastReleaseTime = 0
+        suppressAltKeyUp = false
         if (resetPressedState) {
             altState.pressed = false
             altState.physicallyPressed = false
@@ -329,6 +406,7 @@ class ModifierStateController(
         ctrlState.oneShot = false
         ctrlState.latchFromNavMode = false
         ctrlState.lastReleaseTime = 0
+        suppressCtrlKeyUp = false
         if (resetPressedState) {
             ctrlState.pressed = false
             ctrlState.physicallyPressed = false
@@ -336,11 +414,19 @@ class ModifierStateController(
     }
 
     fun requestShiftOneShotFromAutoCap(): Boolean {
-        return shiftStateMachine.requestOneShot()
+        val changed = shiftStateMachine.requestOneShot()
+        if (changed || shiftStateMachine.state == ShiftState.ONE_SHOT) {
+            shiftOneShotSource = ShiftOneShotSource.AUTO_CAP
+        }
+        return changed
     }
 
     fun consumeShiftOneShot(): Boolean {
-        return shiftStateMachine.consumeOneShot()
+        val consumed = shiftStateMachine.consumeOneShot()
+        if (consumed) {
+            shiftOneShotSource = ShiftOneShotSource.NONE
+        }
+        return consumed
     }
 
     fun resetModifiers(
@@ -359,6 +445,7 @@ class ModifierStateController(
         }
 
         shiftStateMachine.reset()
+        shiftOneShotSource = ShiftOneShotSource.NONE
         shiftPressedFlag = false
         shiftPhysicallyPressedFlag = false
         lastKeyWasModifier = false
@@ -366,12 +453,15 @@ class ModifierStateController(
 
         if (preserveNavMode && savedCtrlLatch) {
             ctrlLatchActive = true
+            suppressCtrlKeyUp = false
         } else {
             if (ctrlLatchFromNavMode || ctrlLatchActive) {
                 onNavModeCancelled()
             }
             modifierKeyHandler.resetCtrlState(ctrlState, preserveNavMode = false)
+            suppressCtrlKeyUp = false
         }
         modifierKeyHandler.resetAltState(altState)
+        suppressAltKeyUp = false
     }
 }

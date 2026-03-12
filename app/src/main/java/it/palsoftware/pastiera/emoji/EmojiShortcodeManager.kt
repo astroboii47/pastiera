@@ -12,6 +12,7 @@ class EmojiShortcodeManager(private val context: Context) {
         private const val EMOJI_DATA_FILE = "emoji.json"
         private const val SYMBOL_SHORTCODES_FILE = "symbol_shortcodes.json"
         private val SHORTCODE_REGEX = Regex("[a-zA-Z0-9_]+")
+        private val COMPLETED_SHORTCODE_REGEX = Regex("(^|[\\s\\(\\[\\{\"'])[:]([a-zA-Z0-9_]{1,30}):$")
     }
 
     private val shortcodeMap = mutableMapOf<String, String>()
@@ -82,5 +83,16 @@ class EmojiShortcodeManager(private val context: Context) {
             return null
         }
         return afterColon to lastColonIndex
+    }
+
+    fun extractCompletedShortcode(textBeforeCursor: String): String? {
+        if (textBeforeCursor.isEmpty() || !textBeforeCursor.endsWith(':')) return null
+        val match = COMPLETED_SHORTCODE_REGEX.find(textBeforeCursor) ?: return null
+        return match.groupValues.getOrNull(2)?.lowercase()
+    }
+
+    fun lookupExactShortcode(shortcode: String): String? {
+        if (shortcode.isBlank()) return null
+        return shortcodeMap[shortcode.lowercase()]
     }
 }

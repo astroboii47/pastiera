@@ -15,6 +15,7 @@ sealed class StatusBarButtonId(val key: String) {
     object MinimalUi : StatusBarButtonId("minimal_ui")
     object Settings : StatusBarButtonId("settings")
     object Symbols : StatusBarButtonId("symbols")
+    object Variations : StatusBarButtonId("variations")
     data class Custom(val customKey: String) : StatusBarButtonId(customKey)
 
     override fun equals(other: Any?): Boolean {
@@ -88,6 +89,9 @@ data class StatusBarCallbacks(
     
     /** Called when symbols button is clicked */
     val onSymbolsPageRequested: (() -> Unit)? = null,
+
+    /** Called when variations row override is requested */
+    val onVariationsToggleRequested: (() -> Unit)? = null,
     
     /** Called to trigger haptic feedback */
     val onHapticFeedback: (() -> Unit)? = null
@@ -120,6 +124,11 @@ sealed class ButtonState {
      * State for minimal UI button - active/inactive.
      */
     data class MinimalUiState(val isActive: Boolean) : ButtonState()
+
+    /**
+     * State for variations button - active when center row is forced to variations.
+     */
+    data class VariationsState(val isActive: Boolean) : ButtonState()
 }
 
 /**

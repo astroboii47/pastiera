@@ -92,6 +92,13 @@ class StatusBarController(
             field = value
             variationBarView?.onAddUserWord = value
         }
+
+    var onSuggestionAccepted: ((String) -> Unit)? = null
+        set(value) {
+            field = value
+            variationBarView?.onSuggestionAccepted = value
+            fullSuggestionsBar?.onSuggestionAccepted = value
+        }
     
     var onLanguageSwitchRequested: (() -> Unit)? = null
         set(value) {
@@ -117,6 +124,12 @@ class StatusBarController(
         set(value) {
             field = value
             variationBarView?.onSymbolsPageRequested = value
+        }
+
+    var onVariationsToggleRequested: (() -> Unit)? = null
+        set(value) {
+            field = value
+            variationBarView?.onVariationsToggleRequested = value
         }
 
     var onHamburgerMenuRequested: (() -> Unit)? = null
@@ -216,6 +229,7 @@ class StatusBarController(
         val shouldDisableAutoCapitalize: Boolean = false,
         val shouldDisableDoubleSpaceToPeriod: Boolean = false,
         val shouldDisableVariations: Boolean = false,
+        val showVariationsOverride: Boolean = false,
         val isEmailField: Boolean = false,
         // UI latch flags for static variation bar layers.
         val shiftLayerLatched: Boolean = false,
@@ -420,10 +434,12 @@ class StatusBarController(
                         onMinimalUiToggleRequested = { handleMinimalUiToggleFromMenu() },
                         onOpenSettings = { openSettings() },
                         onSymbolsPageRequested = onSymbolsPageRequested,
+                        onVariationsToggleRequested = onVariationsToggleRequested,
                         onHapticFeedback = { NotificationHelper.triggerHapticFeedback(context) }
                     )
                 }
                 )
+                fullSuggestionsBar?.onSuggestionAccepted = onSuggestionAccepted
                 // Set subtype cycling parameters if available
                 if (assets != null && imeServiceClass != null) {
                     fullSuggestionsBar?.setSubtypeCyclingParams(assets, imeServiceClass)
@@ -462,6 +478,7 @@ class StatusBarController(
             onMinimalUiToggleRequested = { handleMinimalUiToggleFromMenu() },
             onOpenSettings = { openSettings() },
             onSymbolsPageRequested = onSymbolsPageRequested,
+            onVariationsToggleRequested = onVariationsToggleRequested,
             onHapticFeedback = { NotificationHelper.triggerHapticFeedback(context) }
         )
         menu.show(callbacks) { hideHamburgerMenu() }
@@ -1590,6 +1607,7 @@ class StatusBarController(
         isTitan2Layout = SettingsManager.isTitan2LayoutEnabled(context)
         variationBarView?.onVariationSelectedListener = onVariationSelectedListener
         variationBarView?.onCursorMovedListener = onCursorMovedListener
+        variationBarView?.onSuggestionAccepted = onSuggestionAccepted
         variationBarView?.updateInputConnection(inputConnection)
         variationBarView?.setSymModeActive(snapshot.symPage > 0 || snapshot.clipboardOverlay)
         variationBarView?.updateLanguageButtonText()
@@ -1653,6 +1671,7 @@ class StatusBarController(
             snapshot.addWordCandidate,
             onAddUserWord
         )
+        fullSuggestionsBar?.onSuggestionAccepted = onSuggestionAccepted
         
         if (snapshot.clipboardOverlay) {
             // Show clipboard as dedicated overlay (not part of SYM pages)

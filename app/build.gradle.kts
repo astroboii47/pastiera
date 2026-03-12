@@ -229,6 +229,7 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     // RecyclerView per performance ottimali nella griglia emoji
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("androidx.documentfile:documentfile:1.0.1")
     // Emoji2 per supporto emoji future-proof
     implementation("androidx.emoji2:emoji2:1.4.0")
     implementation("androidx.emoji2:emoji2-views:1.4.0")

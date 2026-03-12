@@ -79,6 +79,8 @@ class VariationBarView(
     var onClipboardRequested: (() -> Unit)? = null
     var onEmojiPickerRequested: (() -> Unit)? = null
     var onSymbolsPageRequested: (() -> Unit)? = null
+    var onSuggestionAccepted: ((String) -> Unit)? = null
+    var onVariationsToggleRequested: (() -> Unit)? = null
     var onHamburgerMenuRequested: (() -> Unit)? = null
     var onMinimalUiToggleRequested: (() -> Unit)? = null
     
@@ -310,7 +312,6 @@ class VariationBarView(
         // Variations are controlled separately from suggestions
         val canShowVariations = !snapshot.shouldDisableVariations
         val canShowSuggestions = !snapshot.shouldDisableSuggestions
-        // Legacy variations: always honor them when present, independent of suggestions.
         val hasDynamicVariations = canShowVariations && snapshot.variations.isNotEmpty()
         val hasSuggestions = canShowSuggestions && snapshot.suggestions.isNotEmpty()
         val useDynamicVariations = !staticModeEnabled && hasDynamicVariations
@@ -318,13 +319,28 @@ class VariationBarView(
 
         val effectiveVariations: List<String>
         val centerContentMode: CenterContentMode
-        // Legacy behavior: give priority to letter variations when available, otherwise suggestions.
         when {
-            useDynamicVariations -> {
+            snapshot.showVariationsOverride && useDynamicVariations -> {
                 effectiveVariations = snapshot.variations
                 centerContentMode = CenterContentMode.VARIATIONS
             }
-            hasSuggestions -> {
+            useDynamicVariations -> {
+                if (hasSuggestions && !snapshot.showVariationsOverride) {
+                    val s0 = snapshot.suggestions.getOrNull(0)
+                    val s1 = snapshot.suggestions.getOrNull(1)
+                    val s2 = snapshot.suggestions.getOrNull(2)
+                    effectiveVariations = listOfNotNull(
+                        if (snapshot.suggestions.size >= 3) s2 else null,
+                        s0,
+                        if (snapshot.suggestions.size >= 2) s1 else null
+                    )
+                    centerContentMode = CenterContentMode.SUGGESTIONS
+                } else {
+                    effectiveVariations = snapshot.variations
+                    centerContentMode = CenterContentMode.VARIATIONS
+                }
+            }
+            hasSuggestions && !snapshot.showVariationsOverride -> {
                 val s0 = snapshot.suggestions.getOrNull(0)
                 val s1 = snapshot.suggestions.getOrNull(1)
                 val s2 = snapshot.suggestions.getOrNull(2)
@@ -341,7 +357,12 @@ class VariationBarView(
                         emailVariations = VariationRepository.loadEmailVariations(context.assets, context)
                     }
                     emailVariations
-                } else if (snapshot.shiftPhysicallyPressed || snapshot.shiftLayerLatched) {
+                } else if (
+                    snapshot.shiftPhysicallyPressed ||
+                    snapshot.shiftOneShot ||
+                    snapshot.capsLockEnabled ||
+                    snapshot.shiftLayerLatched
+                ) {
                     if (staticVariationsShift.isEmpty()) {
                         val loaded = VariationRepository.loadStaticVariationsShift(context.assets, context)
                         staticVariationsShift = if (loaded.isNotEmpty()) {
@@ -351,7 +372,12 @@ class VariationBarView(
                         }
                     }
                     staticVariationsShift
-                } else if (snapshot.altPhysicallyPressed || snapshot.altLayerLatched) {
+                } else if (
+                    snapshot.altPhysicallyPressed ||
+                    snapshot.altOneShot ||
+                    snapshot.altLatchActive ||
+                    snapshot.altLayerLatched
+                ) {
                     if (staticVariationsAlt.isEmpty()) {
                         val loaded = VariationRepository.loadStaticVariationsAlt(context.assets, context)
                         staticVariationsAlt = if (loaded.isNotEmpty()) {
@@ -514,6 +540,7 @@ class VariationBarView(
             onMinimalUiToggleRequested = onMinimalUiToggleRequested,
             onOpenSettings = { openSettings() },
             onSymbolsPageRequested = onSymbolsPageRequested,
+            onVariationsToggleRequested = onVariationsToggleRequested,
             onHapticFeedback = { NotificationHelper.triggerHapticFeedback(context) }
         )
         
@@ -540,6 +567,14 @@ class VariationBarView(
 
             if (buttonId == StatusBarButtonId.Clipboard) {
                 host.updateClipboardCount(snapshot.clipboardCount)
+            } else if (buttonId == StatusBarButtonId.Variations) {
+                buttonRegistry?.updateButton(
+                    StatusBarButtonId.Variations,
+                    hosted.button,
+                    it.palsoftware.pastiera.inputmethod.statusbar.ButtonState.VariationsState(
+                        snapshot.showVariationsOverride
+                    )
+                )
             }
         }
         
@@ -1010,7 +1045,10 @@ class VariationBarView(
                         variation,
                         inputConnection,
                         onVariationSelectedListener,
-                        shouldDisableSuggestions
+                        shouldDisableSuggestions,
+                        onSuggestionCommitted = { committedSuggestion ->
+                            onSuggestionAccepted?.invoke(committedSuggestion)
+                        }
                     )
                 } else if (centerContentMode == CenterContentMode.STATIC) {
                     VariationButtonHandler.createStaticVariationClickListener(

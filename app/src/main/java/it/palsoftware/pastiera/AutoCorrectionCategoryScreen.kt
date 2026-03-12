@@ -57,6 +57,9 @@ fun AutoCorrectionCategoryScreen(
     var suggestionsEnabled by remember {
         mutableStateOf(SettingsManager.getSuggestionsEnabled(context))
     }
+    var nextWordPredictionsEnabled by remember {
+        mutableStateOf(SettingsManager.getNextWordPredictionsEnabled(context))
+    }
     var accentMatchingEnabled by remember {
         mutableStateOf(SettingsManager.getAccentMatchingEnabled(context))
     }
@@ -357,6 +360,49 @@ fun AutoCorrectionCategoryScreen(
                                     )
                                 }
                             }
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(72.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.TextFields,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = stringResource(R.string.next_word_predictions_title),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.next_word_predictions_description),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2
+                                    )
+                                }
+                                Switch(
+                                    checked = nextWordPredictionsEnabled,
+                                    onCheckedChange = { enabled ->
+                                        nextWordPredictionsEnabled = enabled
+                                        SettingsManager.setNextWordPredictionsEnabled(context, enabled)
+                                    },
+                                    enabled = experimentalSuggestionsEnabled && suggestionsEnabled
+                                )
+                            }
+                        }
 
                         Surface(
                             modifier = Modifier

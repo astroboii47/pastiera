@@ -405,6 +405,7 @@ private fun getButtonDisplayName(buttonId: String): String {
         SettingsManager.STATUS_BAR_BUTTON_HAMBURGER -> stringResource(R.string.status_bar_button_hamburger)
         SettingsManager.STATUS_BAR_BUTTON_SETTINGS -> stringResource(R.string.status_bar_button_settings)
         SettingsManager.STATUS_BAR_BUTTON_SYMBOLS -> stringResource(R.string.status_bar_button_symbols)
+        SettingsManager.STATUS_BAR_BUTTON_VARIATIONS -> stringResource(R.string.status_bar_button_variations)
         else -> buttonId
     }
 }
@@ -420,6 +421,7 @@ private fun getButtonDescription(buttonId: String): String {
         SettingsManager.STATUS_BAR_BUTTON_HAMBURGER -> stringResource(R.string.status_bar_button_hamburger_description)
         SettingsManager.STATUS_BAR_BUTTON_SETTINGS -> stringResource(R.string.status_bar_button_settings_description)
         SettingsManager.STATUS_BAR_BUTTON_SYMBOLS -> stringResource(R.string.status_bar_button_symbols_description)
+        SettingsManager.STATUS_BAR_BUTTON_VARIATIONS -> stringResource(R.string.status_bar_button_variations_description)
         else -> ""
     }
 }
@@ -437,6 +439,7 @@ private fun getButtonIconRes(buttonId: String): Int {
         SettingsManager.STATUS_BAR_BUTTON_HAMBURGER -> R.drawable.ic_menu_24
         SettingsManager.STATUS_BAR_BUTTON_SETTINGS -> R.drawable.ic_settings_24
         SettingsManager.STATUS_BAR_BUTTON_SYMBOLS -> R.drawable.ic_emoji_symbols_24
+        SettingsManager.STATUS_BAR_BUTTON_VARIATIONS -> R.drawable.ic_emoji_symbols_24
         else -> R.drawable.ic_settings_24 // Fallback
     }
 }

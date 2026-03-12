@@ -63,6 +63,7 @@ class FullSuggestionsBar(
     private var liveAnnouncementsEnabled: Boolean = false
     private var suggestionsAnnouncementDelayMs: Long = 600L
     private var lastAnnouncedSlots: List<String?> = emptyList()
+    var onSuggestionAccepted: ((String) -> Unit)? = null
     private val targetHeightPx: Int by lazy {
         // Compact row sized around three suggestion pills
         dpToPx(36f)
@@ -362,7 +363,10 @@ class FullSuggestionsBar(
                             suggestion,
                             inputConnection,
                             listener,
-                            shouldDisableSuggestions
+                            shouldDisableSuggestions,
+                            onSuggestionCommitted = { committedSuggestion ->
+                                onSuggestionAccepted?.invoke(committedSuggestion)
+                            }
                         )
                         setOnClickListener { view ->
                             flashSlot(slotIndex)

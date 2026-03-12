@@ -49,6 +49,13 @@ class CandidatesBarController(
             candidatesStatusBar.onAddUserWord = value
         }
 
+    var onSuggestionAccepted: ((String) -> Unit)? = null
+        set(value) {
+            field = value
+            inputStatusBar.onSuggestionAccepted = value
+            candidatesStatusBar.onSuggestionAccepted = value
+        }
+
     var onLanguageSwitchRequested: (() -> Unit)? = null
         set(value) {
             field = value
@@ -75,6 +82,13 @@ class CandidatesBarController(
             field = value
             inputStatusBar.onSymbolsPageRequested = value
             candidatesStatusBar.onSymbolsPageRequested = value
+        }
+
+    var onVariationsToggleRequested: (() -> Unit)? = null
+        set(value) {
+            field = value
+            inputStatusBar.onVariationsToggleRequested = value
+            candidatesStatusBar.onVariationsToggleRequested = value
         }
 
     var onMinimalUiToggleRequested: (() -> Unit)? = null
