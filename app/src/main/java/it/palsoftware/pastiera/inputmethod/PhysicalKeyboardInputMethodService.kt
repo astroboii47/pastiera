@@ -242,12 +242,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     private var symChordUsedSinceKeyDown: Boolean = false
     private var symPhysicallyPressed: Boolean = false
     private var pendingSymToggle: Runnable? = null
-    private var tabBackspacePendingOnKeyUp: Boolean = false
-    private var tabBackspaceUsedSinceKeyDown: Boolean = false
-    private var tabBackspacePhysicallyPressed: Boolean = false
-    private var tabBackspaceChordConsumed: Boolean = false
-    private var tabBackspaceTriggeredKeyCode: Int? = null
-    private var tabBackspaceTriggeredEvent: KeyEvent? = null
+    private var oemTabPendingOnKeyUp: Boolean = false
     private var suppressSyntheticTabUntil: Long = 0L
 
     private val multiTapHandler = Handler(Looper.getMainLooper())
@@ -280,35 +275,6 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     private fun cancelPendingSymToggle() {
         pendingSymToggle?.let { uiHandler.removeCallbacks(it) }
         pendingSymToggle = null
-    }
-
-    private fun handleTabBackspaceAction(
-        action: SettingsManager.DeleteShortcutAction,
-        keyCode: Int,
-        event: KeyEvent?
-    ): Boolean {
-        val inputConnection = currentInputConnection ?: return false
-        return when (action) {
-            SettingsManager.DeleteShortcutAction.SYSTEM_DEFAULT -> {
-                TextSelectionHelper.deleteToLineStart(inputConnection)
-            }
-            SettingsManager.DeleteShortcutAction.DELETE_WORD -> {
-                TextSelectionHelper.deleteLastWord(inputConnection) ||
-                    inputConnection.deleteSurroundingText(1, 0).let { true }
-            }
-            SettingsManager.DeleteShortcutAction.FORWARD_DELETE -> {
-                if (keyCode == KeyEvent.KEYCODE_FORWARD_DEL) {
-                    inputConnection.deleteSurroundingText(0, 1)
-                } else {
-                    inputConnection.deleteSurroundingText(1, 0)
-                }
-                true
-            }
-            SettingsManager.DeleteShortcutAction.NORMAL -> {
-                inputConnection.deleteSurroundingText(1, 0)
-                true
-            }
-        }
     }
 
     private fun stopClipboardCleanupTimer() {
@@ -2409,39 +2375,21 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             return true
         }
 
-        val tabBackspaceAction = SettingsManager.getTabBackspaceAction(this)
         if (
             isOemTabTrigger(keyCode, event) &&
             event?.repeatCount == 0
         ) {
-            tabBackspacePendingOnKeyUp = true
-            tabBackspaceUsedSinceKeyDown = false
-            tabBackspacePhysicallyPressed = true
-            tabBackspaceChordConsumed = false
-            tabBackspaceTriggeredKeyCode = null
-            tabBackspaceTriggeredEvent = null
+            oemTabPendingOnKeyUp = true
             return true
         }
 
         if (
-            (tabBackspacePendingOnKeyUp || tabBackspacePhysicallyPressed) &&
+            oemTabPendingOnKeyUp &&
             !isOemTabTrigger(keyCode, event) &&
             event?.repeatCount == 0 &&
             !isPureModifierKey(keyCode)
         ) {
-            if (keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_FORWARD_DEL) {
-                tabBackspaceUsedSinceKeyDown = true
-                tabBackspaceChordConsumed = true
-                tabBackspaceTriggeredKeyCode = keyCode
-                tabBackspaceTriggeredEvent = event
-                suppressSyntheticTabUntil = (event?.eventTime ?: System.currentTimeMillis()) + 500L
-                return true
-            }
-            tabBackspacePendingOnKeyUp = false
-            tabBackspacePhysicallyPressed = false
-            tabBackspaceChordConsumed = false
-            tabBackspaceTriggeredKeyCode = null
-            tabBackspaceTriggeredEvent = null
+            oemTabPendingOnKeyUp = false
         }
 
         if (hasEditableField && isSymTriggerKey(keyCode) && event?.repeatCount == 0) {
@@ -2911,12 +2859,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                 symChordUsedSinceKeyDown = false
             }
             if (keyCode == KeyEvent.KEYCODE_TAB) {
-                tabBackspacePendingOnKeyUp = false
-                tabBackspaceUsedSinceKeyDown = false
-                tabBackspacePhysicallyPressed = false
-                tabBackspaceChordConsumed = false
-                tabBackspaceTriggeredKeyCode = null
-                tabBackspaceTriggeredEvent = null
+                oemTabPendingOnKeyUp = false
             }
             return inputEventRouter.handleKeyUpWithNoEditableField(
                 keyCode = keyCode,
@@ -2945,50 +2888,19 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         // Always notify the tracker (even when the event is consumed)
         KeyboardEventTracker.notifyKeyEvent(keyCode, event, "KEY_UP")
 
-        val tabBackspaceAction = SettingsManager.getTabBackspaceAction(this)
-
         if (isSyntheticOemTabFollowUp(keyCode, event)) {
             return true
         }
 
-        if (
-            (tabBackspacePendingOnKeyUp || tabBackspacePhysicallyPressed || tabBackspaceChordConsumed) &&
-            (keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_FORWARD_DEL)
-        ) {
-            return true
-        }
-
         if (isOemTabTrigger(keyCode, event)) {
-            val shouldOpenSym =
-                tabBackspacePendingOnKeyUp &&
-                    !tabBackspaceUsedSinceKeyDown &&
-                    !tabBackspaceChordConsumed
-            val consumedByTabBackspaceSetting =
-                tabBackspacePendingOnKeyUp ||
-                    tabBackspaceUsedSinceKeyDown ||
-                    tabBackspacePhysicallyPressed ||
-                    tabBackspaceChordConsumed
-            val triggeredKeyCode = tabBackspaceTriggeredKeyCode ?: KeyEvent.KEYCODE_DEL
-            val triggeredEvent = tabBackspaceTriggeredEvent
-
-            tabBackspacePhysicallyPressed = false
-            tabBackspacePendingOnKeyUp = false
-            tabBackspaceUsedSinceKeyDown = false
-            tabBackspaceChordConsumed = false
-            tabBackspaceTriggeredKeyCode = null
-            tabBackspaceTriggeredEvent = null
-
-            if (consumedByTabBackspaceSetting) {
+            val shouldOpenSym = oemTabPendingOnKeyUp
+            oemTabPendingOnKeyUp = false
+            if (shouldOpenSym) {
                 suppressSyntheticTabUntil = (event?.eventTime ?: System.currentTimeMillis()) + 500L
-                if (shouldOpenSym) {
-                    val eventTime = event?.eventTime ?: System.currentTimeMillis()
-                    if (eventTime - lastSymToggleTime >= SYM_TOGGLE_DEBOUNCE_MS) {
-                        symLayoutController.toggleSymPage()
-                        lastSymToggleTime = eventTime
-                        updateStatusBarText()
-                    }
-                } else {
-                    handleTabBackspaceAction(tabBackspaceAction, triggeredKeyCode, triggeredEvent)
+                val eventTime = event?.eventTime ?: System.currentTimeMillis()
+                if (eventTime - lastSymToggleTime >= SYM_TOGGLE_DEBOUNCE_MS) {
+                    symLayoutController.toggleSymPage()
+                    lastSymToggleTime = eventTime
                     updateStatusBarText()
                 }
                 return true
