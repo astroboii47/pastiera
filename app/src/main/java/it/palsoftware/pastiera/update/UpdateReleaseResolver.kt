@@ -20,15 +20,10 @@ internal data class ReleaseInfo(
 )
 
 internal fun findLatestRelease(releases: List<GitHubRelease>, releaseChannel: String): ReleaseInfo? {
-    val normalizedChannel = releaseChannel.lowercase()
-
     for (release in releases) {
         if (release.draft) continue
-
-        val matchesChannel = when (normalizedChannel) {
-            "nightly" -> release.prerelease && release.tagName.startsWith("nightly/")
-            else -> !release.prerelease
-        }
+        val matchesChannel =
+            !release.prerelease && release.tagName.lowercase().startsWith("enhanced-v")
         if (!matchesChannel) continue
 
         return ReleaseInfo(
@@ -48,4 +43,9 @@ internal fun findApkDownloadUrl(assets: List<ReleaseAsset>): String? =
     }
 
 internal fun normalizeReleaseVersion(version: String): String =
-    version.removePrefix("nightly/").removePrefix("v").removePrefix("V")
+    version
+        .removePrefix("nightly/")
+        .removePrefix("enhanced-v")
+        .removePrefix("enhanced-V")
+        .removePrefix("v")
+        .removePrefix("V")

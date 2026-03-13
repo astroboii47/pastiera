@@ -18,9 +18,9 @@ import org.json.JSONObject
 import java.io.IOException
 
 private const val GITHUB_RELEASES_URL =
-    "https://api.github.com/repos/palsoftware/pastiera/releases?per_page=20"
+    "https://api.github.com/repos/astroboii47/pastiera/releases?per_page=20"
 const val GITHUB_RELEASES_PAGE =
-    "https://github.com/palsoftware/pastiera/releases"
+    "https://github.com/astroboii47/pastiera/releases"
 
 private val client = OkHttpClient()
 private val mainHandler = Handler(Looper.getMainLooper())

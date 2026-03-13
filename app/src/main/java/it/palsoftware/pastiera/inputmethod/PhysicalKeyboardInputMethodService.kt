@@ -240,6 +240,15 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     private var lastSymToggleTime: Long = 0L
     private var symTogglePendingOnKeyUp: Boolean = false
     private var symChordUsedSinceKeyDown: Boolean = false
+    private var symPhysicallyPressed: Boolean = false
+    private var pendingSymToggle: Runnable? = null
+    private var tabBackspacePendingOnKeyUp: Boolean = false
+    private var tabBackspaceUsedSinceKeyDown: Boolean = false
+    private var tabBackspacePhysicallyPressed: Boolean = false
+    private var tabBackspaceChordConsumed: Boolean = false
+    private var tabBackspaceTriggeredKeyCode: Int? = null
+    private var tabBackspaceTriggeredEvent: KeyEvent? = null
+    private var suppressSyntheticTabUntil: Long = 0L
 
     private val multiTapHandler = Handler(Looper.getMainLooper())
     private val multiTapController = MultiTapController(
@@ -247,6 +256,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         timeoutMs = MULTI_TAP_TIMEOUT_MS
     )
     private val uiHandler = Handler(Looper.getMainLooper())
+    private val symOneShotWindowMs = 260L
     private val clipboardCleanupIntervalMs = 60_000L
     private val clipboardCleanupRunnable = object : Runnable {
         override fun run() {
@@ -267,6 +277,40 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         uiHandler.postDelayed(clipboardCleanupRunnable, clipboardCleanupIntervalMs)
     }
 
+    private fun cancelPendingSymToggle() {
+        pendingSymToggle?.let { uiHandler.removeCallbacks(it) }
+        pendingSymToggle = null
+    }
+
+    private fun handleTabBackspaceAction(
+        action: SettingsManager.DeleteShortcutAction,
+        keyCode: Int,
+        event: KeyEvent?
+    ): Boolean {
+        val inputConnection = currentInputConnection ?: return false
+        return when (action) {
+            SettingsManager.DeleteShortcutAction.SYSTEM_DEFAULT -> {
+                TextSelectionHelper.deleteToLineStart(inputConnection)
+            }
+            SettingsManager.DeleteShortcutAction.DELETE_WORD -> {
+                TextSelectionHelper.deleteLastWord(inputConnection) ||
+                    inputConnection.deleteSurroundingText(1, 0).let { true }
+            }
+            SettingsManager.DeleteShortcutAction.FORWARD_DELETE -> {
+                if (keyCode == KeyEvent.KEYCODE_FORWARD_DEL) {
+                    inputConnection.deleteSurroundingText(0, 1)
+                } else {
+                    inputConnection.deleteSurroundingText(1, 0)
+                }
+                true
+            }
+            SettingsManager.DeleteShortcutAction.NORMAL -> {
+                inputConnection.deleteSurroundingText(1, 0)
+                true
+            }
+        }
+    }
+
     private fun stopClipboardCleanupTimer() {
         uiHandler.removeCallbacks(clipboardCleanupRunnable)
     }
@@ -276,6 +320,20 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
 
     private fun isSymTriggerKey(keyCode: Int): Boolean {
         return keyCode == KEYCODE_SYM || keyCode == KEYCODE_SYM_SHORTCUT_ALIAS
+    }
+
+    private fun isOemTabTrigger(keyCode: Int, event: KeyEvent?): Boolean {
+        return keyCode == KeyEvent.KEYCODE_TAB &&
+            event != null &&
+            event.scanCode == 253
+    }
+
+    private fun isSyntheticOemTabFollowUp(keyCode: Int, event: KeyEvent?): Boolean {
+        val eventTime = event?.eventTime ?: 0L
+        return isOemTabTrigger(keyCode, event) &&
+            event != null &&
+            event.deviceId < 0 &&
+            eventTime <= suppressSyntheticTabUntil
     }
 
     private fun updateInputContextState(info: EditorInfo?) {
@@ -970,6 +1028,11 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             // Toggle symbols as SYM page 2
             symLayoutController.openSymbolsPage()
             updateStatusBarText()
+        }
+        candidatesBarController.onCloseSymRequested = {
+            if (symLayoutController.closeSymPage()) {
+                updateStatusBarText()
+            }
         }
         candidatesBarController.onVariationsToggleRequested = {
             showVariationsOverride = !showVariationsOverride
@@ -2342,19 +2405,92 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             }
         }
 
+        if (isSyntheticOemTabFollowUp(keyCode, event)) {
+            return true
+        }
+
+        val tabBackspaceAction = SettingsManager.getTabBackspaceAction(this)
+        if (
+            isOemTabTrigger(keyCode, event) &&
+            event?.repeatCount == 0
+        ) {
+            tabBackspacePendingOnKeyUp = true
+            tabBackspaceUsedSinceKeyDown = false
+            tabBackspacePhysicallyPressed = true
+            tabBackspaceChordConsumed = false
+            tabBackspaceTriggeredKeyCode = null
+            tabBackspaceTriggeredEvent = null
+            return true
+        }
+
+        if (
+            (tabBackspacePendingOnKeyUp || tabBackspacePhysicallyPressed) &&
+            !isOemTabTrigger(keyCode, event) &&
+            event?.repeatCount == 0 &&
+            !isPureModifierKey(keyCode)
+        ) {
+            if (keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_FORWARD_DEL) {
+                tabBackspaceUsedSinceKeyDown = true
+                tabBackspaceChordConsumed = true
+                tabBackspaceTriggeredKeyCode = keyCode
+                tabBackspaceTriggeredEvent = event
+                suppressSyntheticTabUntil = (event?.eventTime ?: System.currentTimeMillis()) + 500L
+                return true
+            }
+            tabBackspacePendingOnKeyUp = false
+            tabBackspacePhysicallyPressed = false
+            tabBackspaceChordConsumed = false
+            tabBackspaceTriggeredKeyCode = null
+            tabBackspaceTriggeredEvent = null
+        }
+
         if (hasEditableField && isSymTriggerKey(keyCode) && event?.repeatCount == 0) {
+            cancelPendingSymToggle()
+            symPhysicallyPressed = true
             symTogglePendingOnKeyUp = true
             symChordUsedSinceKeyDown = false
         }
 
         if (
             hasEditableField &&
-            symTogglePendingOnKeyUp &&
+            (symTogglePendingOnKeyUp || symPhysicallyPressed) &&
             !isSymTriggerKey(keyCode) &&
             event?.repeatCount == 0 &&
             !isPureModifierKey(keyCode)
         ) {
+            cancelPendingSymToggle()
             symChordUsedSinceKeyDown = true
+            if (keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_FORWARD_DEL) {
+                when (SettingsManager.getSymDeleteAction(this)) {
+                    SettingsManager.DeleteShortcutAction.SYSTEM_DEFAULT -> {
+                        symTogglePendingOnKeyUp = false
+                        symChordUsedSinceKeyDown = true
+                        updateStatusBarText()
+                        return super.onKeyDown(keyCode, event)
+                    }
+                    SettingsManager.DeleteShortcutAction.DELETE_WORD -> {
+                        currentInputConnection?.let {
+                            TextSelectionHelper.deleteLastWord(it)
+                        }
+                        symTogglePendingOnKeyUp = false
+                        symChordUsedSinceKeyDown = true
+                        updateStatusBarText()
+                        return true
+                    }
+                    SettingsManager.DeleteShortcutAction.NORMAL,
+                    SettingsManager.DeleteShortcutAction.FORWARD_DELETE -> {
+                        if (keyCode == KeyEvent.KEYCODE_FORWARD_DEL) {
+                            currentInputConnection?.deleteSurroundingText(0, 1)
+                        } else {
+                            currentInputConnection?.deleteSurroundingText(1, 0)
+                        }
+                        symTogglePendingOnKeyUp = false
+                        symChordUsedSinceKeyDown = true
+                        updateStatusBarText()
+                        return true
+                    }
+                }
+            }
             val symChar = symLayoutController.resolveChordSymbol(
                 keyCode = keyCode,
                 shiftPressed = event.isShiftPressed || shiftOneShot || capsLockEnabled
@@ -2604,9 +2740,22 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                 keyCode = keyCode,
                 event = event,
                 inputConnection = ic,
-                altActive = altActiveNow
+                altActive = altActiveNow,
+                ctrlActive = ctrlActiveNow
             )
         ) {
+            if (keyCode == KeyEvent.KEYCODE_DEL) {
+                if (altOneShot && !altLatchActive && !altPhysicallyPressed) {
+                    altOneShot = false
+                }
+                if (ctrlOneShot && !ctrlLatchActive && !ctrlPhysicallyPressed && !ctrlLatchFromNavMode) {
+                    ctrlOneShot = false
+                }
+                if (shiftOneShot && !capsLockEnabled && !shiftPhysicallyPressed) {
+                    shiftOneShot = false
+                }
+                updateStatusBarText()
+            }
             return true
         }
         if (!altActiveNow) {
@@ -2756,8 +2905,18 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         // If NO editable field is active, handle ONLY nav mode Ctrl release
         if (!hasEditableField) {
             if (isSymTriggerKey(keyCode)) {
+                cancelPendingSymToggle()
+                symPhysicallyPressed = false
                 symTogglePendingOnKeyUp = false
                 symChordUsedSinceKeyDown = false
+            }
+            if (keyCode == KeyEvent.KEYCODE_TAB) {
+                tabBackspacePendingOnKeyUp = false
+                tabBackspaceUsedSinceKeyDown = false
+                tabBackspacePhysicallyPressed = false
+                tabBackspaceChordConsumed = false
+                tabBackspaceTriggeredKeyCode = null
+                tabBackspaceTriggeredEvent = null
             }
             return inputEventRouter.handleKeyUpWithNoEditableField(
                 keyCode = keyCode,
@@ -2785,6 +2944,56 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         
         // Always notify the tracker (even when the event is consumed)
         KeyboardEventTracker.notifyKeyEvent(keyCode, event, "KEY_UP")
+
+        val tabBackspaceAction = SettingsManager.getTabBackspaceAction(this)
+
+        if (isSyntheticOemTabFollowUp(keyCode, event)) {
+            return true
+        }
+
+        if (
+            (tabBackspacePendingOnKeyUp || tabBackspacePhysicallyPressed || tabBackspaceChordConsumed) &&
+            (keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_FORWARD_DEL)
+        ) {
+            return true
+        }
+
+        if (isOemTabTrigger(keyCode, event)) {
+            val shouldOpenSym =
+                tabBackspacePendingOnKeyUp &&
+                    !tabBackspaceUsedSinceKeyDown &&
+                    !tabBackspaceChordConsumed
+            val consumedByTabBackspaceSetting =
+                tabBackspacePendingOnKeyUp ||
+                    tabBackspaceUsedSinceKeyDown ||
+                    tabBackspacePhysicallyPressed ||
+                    tabBackspaceChordConsumed
+            val triggeredKeyCode = tabBackspaceTriggeredKeyCode ?: KeyEvent.KEYCODE_DEL
+            val triggeredEvent = tabBackspaceTriggeredEvent
+
+            tabBackspacePhysicallyPressed = false
+            tabBackspacePendingOnKeyUp = false
+            tabBackspaceUsedSinceKeyDown = false
+            tabBackspaceChordConsumed = false
+            tabBackspaceTriggeredKeyCode = null
+            tabBackspaceTriggeredEvent = null
+
+            if (consumedByTabBackspaceSetting) {
+                suppressSyntheticTabUntil = (event?.eventTime ?: System.currentTimeMillis()) + 500L
+                if (shouldOpenSym) {
+                    val eventTime = event?.eventTime ?: System.currentTimeMillis()
+                    if (eventTime - lastSymToggleTime >= SYM_TOGGLE_DEBOUNCE_MS) {
+                        symLayoutController.toggleSymPage()
+                        lastSymToggleTime = eventTime
+                        updateStatusBarText()
+                    }
+                } else {
+                    handleTabBackspaceAction(tabBackspaceAction, triggeredKeyCode, triggeredEvent)
+                    updateStatusBarText()
+                }
+                return true
+            }
+        }
 
         if (
             keyCode == KeyEvent.KEYCODE_SHIFT_LEFT ||
@@ -2835,6 +3044,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                     modifierStateBeforeHold = null
                     modifierStateController.shiftPressed = false
                     modifierStateController.shiftPhysicallyPressed = false
+                    modifierStateController.shiftOneShot = false
                     updateStatusBarText()
                 } else {
                     val result = modifierStateController.handleShiftKeyUp(keyCode)
@@ -2867,6 +3077,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                     modifierStateBeforeHold = null
                     modifierStateController.ctrlPressed = false
                     modifierStateController.ctrlPhysicallyPressed = false
+                    modifierStateController.ctrlOneShot = false
                     updateStatusBarText()
                 } else {
                     val result = modifierStateController.handleCtrlKeyUp(
@@ -2906,6 +3117,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                     modifierStateBeforeHold = null
                     modifierStateController.altPressed = false
                     modifierStateController.altPhysicallyPressed = false
+                    modifierStateController.altOneShot = false
                     updateStatusBarText()
                 } else {
                     val result = modifierStateController.handleAltKeyUp(
@@ -2927,16 +3139,24 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         
         // Toggle SYM layout on key release only when SYM was tapped alone.
         if (isSymTriggerKey(keyCode)) {
+            val eventTime = event?.eventTime ?: System.currentTimeMillis()
             if (symTogglePendingOnKeyUp && !symChordUsedSinceKeyDown) {
-                val eventTime = event?.eventTime ?: System.currentTimeMillis()
-                if (eventTime - lastSymToggleTime >= SYM_TOGGLE_DEBOUNCE_MS) {
-                    symLayoutController.toggleSymPage()
-                    lastSymToggleTime = eventTime
-                    updateStatusBarText()
-                }
+                cancelPendingSymToggle()
+                pendingSymToggle = Runnable {
+                    if (symTogglePendingOnKeyUp && !symChordUsedSinceKeyDown) {
+                        val now = System.currentTimeMillis()
+                        if (now - lastSymToggleTime >= SYM_TOGGLE_DEBOUNCE_MS) {
+                            symLayoutController.toggleSymPage()
+                            lastSymToggleTime = now
+                            updateStatusBarText()
+                        }
+                    }
+                    symTogglePendingOnKeyUp = false
+                    symChordUsedSinceKeyDown = false
+                    pendingSymToggle = null
+                }.also { uiHandler.postDelayed(it, symOneShotWindowMs) }
             }
-            symTogglePendingOnKeyUp = false
-            symChordUsedSinceKeyDown = false
+            symPhysicallyPressed = false
             return true
         }
         

@@ -345,5 +345,29 @@ object TextSelectionHelper {
         }
         return false
     }
-}
 
+    /**
+     * Deletes from the cursor back to the start of the current line.
+     */
+    fun deleteToLineStart(inputConnection: InputConnection): Boolean {
+        try {
+            val textBeforeCursor = inputConnection.getTextBeforeCursor(1000, 0)
+            if (textBeforeCursor != null && textBeforeCursor.isNotEmpty()) {
+                val lastNewline = textBeforeCursor.lastIndexOf('\n')
+                val charsToDelete = if (lastNewline >= 0) {
+                    textBeforeCursor.length - (lastNewline + 1)
+                } else {
+                    textBeforeCursor.length
+                }
+                if (charsToDelete > 0) {
+                    inputConnection.deleteSurroundingText(charsToDelete, 0)
+                    Log.d(TAG, "deleteToLineStart: deleted $charsToDelete characters")
+                    return true
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in deleteToLineStart", e)
+        }
+        return false
+    }
+}

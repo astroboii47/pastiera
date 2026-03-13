@@ -84,6 +84,13 @@ class CandidatesBarController(
             candidatesStatusBar.onSymbolsPageRequested = value
         }
 
+    var onCloseSymRequested: (() -> Unit)? = null
+        set(value) {
+            field = value
+            inputStatusBar.onCloseSymRequested = value
+            candidatesStatusBar.onCloseSymRequested = value
+        }
+
     var onVariationsToggleRequested: (() -> Unit)? = null
         set(value) {
             field = value

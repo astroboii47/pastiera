@@ -51,7 +51,7 @@ android {
     val ciVersionCode = providers.gradleProperty("PASTIERA_VERSION_CODE").orNull?.toIntOrNull()
     val ciVersionName = providers.gradleProperty("PASTIERA_VERSION_NAME").orNull
     val nightlyVersionCode = providers.gradleProperty("PASTIERA_NIGHTLY_VERSION_CODE").orNull?.toIntOrNull()
-    val nightlyVersionNameSuffix = providers.gradleProperty("PASTIERA_NIGHTLY_VERSION_SUFFIX").orNull ?: "-nightly"
+    val forkDisplayVersionName = providers.gradleProperty("PASTIERA_ENHANCED_DISPLAY_VERSION").orNull ?: "3.0"
     val isFdroidBuild = gradleBooleanProperty("PASTIERA_FDROID_BUILD")
     val klipyApiKey = providers.gradleProperty("PASTIERA_KLIPY_API_KEY").orNull ?: ""
 
@@ -113,9 +113,9 @@ android {
             if (nightlyVersionCode != null) {
                 versionCode = nightlyVersionCode
             }
-            versionNameSuffix = nightlyVersionNameSuffix
-            resValue("string", "app_name", "Pastiera Nightly")
-            resValue("string", "input_method_name", "Pastiera Nightly")
+            versionName = forkDisplayVersionName
+            resValue("string", "app_name", "Pastiera Enhanced $forkDisplayVersionName")
+            resValue("string", "input_method_name", "Pastiera Enhanced")
             buildConfigField("String", "RELEASE_CHANNEL", "\"nightly\"")
             buildConfigField("boolean", "IS_FDROID_BUILD", if (isFdroidBuild) "true" else "false")
             buildConfigField("boolean", "ENABLE_GITHUB_UPDATE_CHECKS", if (isFdroidBuild) "false" else "true")

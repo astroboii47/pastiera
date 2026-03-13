@@ -118,6 +118,8 @@ class StatusBarController(
             variationBarView?.onEmojiPickerRequested = value
         }
 
+    var onCloseSymRequested: (() -> Unit)? = null
+
     var onGifSelected: ((KlipyGifResult) -> Unit)? = null
     
     var onSymbolsPageRequested: (() -> Unit)? = null
@@ -1186,8 +1188,12 @@ class StatusBarController(
         }
         button.addView(icon)
         button.setOnClickListener {
-            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-            imm?.hideSoftInputFromWindow(button.windowToken, 0)
+            if (onCloseSymRequested != null) {
+                onCloseSymRequested?.invoke()
+            } else {
+                val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                imm?.hideSoftInputFromWindow(button.windowToken, 0)
+            }
         }
         return button
     }

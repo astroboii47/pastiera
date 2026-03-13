@@ -63,7 +63,12 @@ object SettingsManager {
     private const val KEY_TRACKPAD_GESTURES_ENABLED = "trackpad_gestures_enabled" // Whether trackpad gesture suggestions are enabled
     private const val KEY_TRACKPAD_SWIPE_THRESHOLD = "trackpad_swipe_threshold" // Threshold for swipe detection on trackpad
     private const val KEY_SHIFT_BACKSPACE_DELETE = "shift_backspace_delete" // Shift + Backspace performs forward delete
-    private const val KEY_ALT_BACKSPACE_DELETE = "alt_backspace_delete" // Alt + Backspace performs forward delete
+    private const val KEY_SHIFT_BACKSPACE_ACTION = "shift_backspace_action" // normal | forward | word | system
+    private const val KEY_ALT_BACKSPACE_DELETE = "alt_backspace_delete" // Legacy boolean for Alt+Backspace behavior
+    private const val KEY_ALT_BACKSPACE_ACTION = "alt_backspace_action" // normal | forward | word | system
+    private const val KEY_CTRL_BACKSPACE_ACTION = "ctrl_backspace_action" // normal | forward | word | system
+    private const val KEY_TAB_BACKSPACE_ACTION = "tab_backspace_action" // normal | forward | word | system
+    private const val KEY_SYM_DELETE_ACTION = "sym_delete_action" // normal | word | system
     private const val KEY_BACKSPACE_AT_START_DELETE = "backspace_at_start_delete" // Backspace at line start performs forward delete
     private const val KEY_SHIFT_KEYMAPPER_GUARD_ENABLED = "shift_keymapper_guard_enabled" // Ignore synthetic rapid second Shift presses from remappers
     private const val KEY_CTRL_KEYMAPPER_GUARD_ENABLED = "ctrl_keymapper_guard_enabled" // Ignore synthetic rapid second Ctrl presses from remappers
@@ -169,6 +174,23 @@ object SettingsManager {
         FOLLOW_SYSTEM("follow_system"),
         FORCE_MINIMAL("force_minimal"),
         FORCE_FULL("force_full")
+    }
+
+    enum class DeleteShortcutAction(val storageValue: String) {
+        NORMAL("normal"),
+        FORWARD_DELETE("forward"),
+        DELETE_WORD("word"),
+        SYSTEM_DEFAULT("system");
+
+        companion object {
+            fun fromStorageValue(value: String?): DeleteShortcutAction {
+                return when (value) {
+                    "off" -> NORMAL
+                    "line" -> SYSTEM_DEFAULT
+                    else -> entries.firstOrNull { it.storageValue == value } ?: NORMAL
+                }
+            }
+        }
     }
 
     /**
@@ -516,19 +538,78 @@ object SettingsManager {
             .apply()
     }
 
-    /**
-     * Returns whether Alt+Backspace performs forward delete.
-     */
-    fun getAltBackspaceDelete(context: Context): Boolean {
-        return getPreferences(context).getBoolean(KEY_ALT_BACKSPACE_DELETE, DEFAULT_ALT_BACKSPACE_DELETE)
+    fun getShiftBackspaceAction(context: Context): DeleteShortcutAction {
+        val prefs = getPreferences(context)
+        val storedAction = prefs.getString(KEY_SHIFT_BACKSPACE_ACTION, null)
+        if (storedAction != null) {
+            return DeleteShortcutAction.fromStorageValue(storedAction)
+        }
+
+        val legacyEnabled = prefs.getBoolean(KEY_SHIFT_BACKSPACE_DELETE, DEFAULT_SHIFT_BACKSPACE_DELETE)
+        return if (legacyEnabled) {
+            DeleteShortcutAction.FORWARD_DELETE
+        } else {
+            DeleteShortcutAction.NORMAL
+        }
     }
 
-    /**
-     * Sets whether Alt+Backspace performs forward delete.
-     */
-    fun setAltBackspaceDelete(context: Context, enabled: Boolean) {
+    fun setShiftBackspaceAction(context: Context, action: DeleteShortcutAction) {
         getPreferences(context).edit()
-            .putBoolean(KEY_ALT_BACKSPACE_DELETE, enabled)
+            .putString(KEY_SHIFT_BACKSPACE_ACTION, action.storageValue)
+            .apply()
+    }
+
+    fun getAltBackspaceAction(context: Context): DeleteShortcutAction {
+        val prefs = getPreferences(context)
+        val storedAction = prefs.getString(KEY_ALT_BACKSPACE_ACTION, null)
+        if (storedAction != null) {
+            return DeleteShortcutAction.fromStorageValue(storedAction)
+        }
+
+        val legacyEnabled = prefs.getBoolean(KEY_ALT_BACKSPACE_DELETE, DEFAULT_ALT_BACKSPACE_DELETE)
+        return if (legacyEnabled) {
+            DeleteShortcutAction.FORWARD_DELETE
+        } else {
+            DeleteShortcutAction.NORMAL
+        }
+    }
+
+    fun setAltBackspaceAction(context: Context, action: DeleteShortcutAction) {
+        getPreferences(context).edit()
+            .putString(KEY_ALT_BACKSPACE_ACTION, action.storageValue)
+            .apply()
+    }
+
+    fun getCtrlBackspaceAction(context: Context): DeleteShortcutAction {
+        val storedAction = getPreferences(context).getString(KEY_CTRL_BACKSPACE_ACTION, null)
+        return DeleteShortcutAction.fromStorageValue(storedAction)
+    }
+
+    fun setCtrlBackspaceAction(context: Context, action: DeleteShortcutAction) {
+        getPreferences(context).edit()
+            .putString(KEY_CTRL_BACKSPACE_ACTION, action.storageValue)
+            .apply()
+    }
+
+    fun getTabBackspaceAction(context: Context): DeleteShortcutAction {
+        val storedAction = getPreferences(context).getString(KEY_TAB_BACKSPACE_ACTION, null)
+        return DeleteShortcutAction.fromStorageValue(storedAction)
+    }
+
+    fun setTabBackspaceAction(context: Context, action: DeleteShortcutAction) {
+        getPreferences(context).edit()
+            .putString(KEY_TAB_BACKSPACE_ACTION, action.storageValue)
+            .apply()
+    }
+
+    fun getSymDeleteAction(context: Context): DeleteShortcutAction {
+        val storedAction = getPreferences(context).getString(KEY_SYM_DELETE_ACTION, null)
+        return DeleteShortcutAction.fromStorageValue(storedAction)
+    }
+
+    fun setSymDeleteAction(context: Context, action: DeleteShortcutAction) {
+        getPreferences(context).edit()
+            .putString(KEY_SYM_DELETE_ACTION, action.storageValue)
             .apply()
     }
 

@@ -651,28 +651,68 @@ class InputEventRouter(
         keyCode: Int,
         event: KeyEvent?,
         inputConnection: InputConnection?,
-        altActive: Boolean
+        altActive: Boolean,
+        ctrlActive: Boolean
     ): Boolean {
         if (keyCode != KeyEvent.KEYCODE_DEL || inputConnection == null) {
             return false
         }
 
-        val shiftTrigger =
-            SettingsManager.getShiftBackspaceDelete(context) &&
-            event?.isShiftPressed == true
-        val altTrigger =
-            SettingsManager.getAltBackspaceDelete(context) &&
-            altActive
+        val shiftTrigger = event?.isShiftPressed == true
+        if (shiftTrigger) {
+            return when (SettingsManager.getShiftBackspaceAction(context)) {
+                SettingsManager.DeleteShortcutAction.SYSTEM_DEFAULT -> false
+                SettingsManager.DeleteShortcutAction.DELETE_WORD ->
+                    TextSelectionHelper.deleteLastWord(inputConnection)
+                SettingsManager.DeleteShortcutAction.FORWARD_DELETE -> {
+                    inputConnection.deleteSurroundingText(0, 1)
+                    true
+                }
+                SettingsManager.DeleteShortcutAction.NORMAL -> {
+                    inputConnection.deleteSurroundingText(1, 0)
+                    true
+                }
+            }
+        }
 
-        if (shiftTrigger || altTrigger) {
-            inputConnection.deleteSurroundingText(0, 1)
-            return true
+        if (altActive) {
+            return when (SettingsManager.getAltBackspaceAction(context)) {
+                SettingsManager.DeleteShortcutAction.SYSTEM_DEFAULT -> false
+                SettingsManager.DeleteShortcutAction.DELETE_WORD ->
+                    TextSelectionHelper.deleteLastWord(inputConnection)
+                SettingsManager.DeleteShortcutAction.FORWARD_DELETE -> {
+                    inputConnection.deleteSurroundingText(0, 1)
+                    true
+                }
+                SettingsManager.DeleteShortcutAction.NORMAL -> {
+                    inputConnection.deleteSurroundingText(1, 0)
+                    true
+                }
+            }
+        }
+
+        if (ctrlActive) {
+            return when (SettingsManager.getCtrlBackspaceAction(context)) {
+                SettingsManager.DeleteShortcutAction.SYSTEM_DEFAULT ->
+                    TextSelectionHelper.deleteToLineStart(inputConnection)
+                SettingsManager.DeleteShortcutAction.DELETE_WORD ->
+                    TextSelectionHelper.deleteLastWord(inputConnection)
+                SettingsManager.DeleteShortcutAction.FORWARD_DELETE -> {
+                    inputConnection.deleteSurroundingText(0, 1)
+                    true
+                }
+                SettingsManager.DeleteShortcutAction.NORMAL -> {
+                    inputConnection.deleteSurroundingText(1, 0)
+                    true
+                }
+            }
         }
 
         if (
             SettingsManager.getBackspaceAtStartDelete(context) &&
             event?.isShiftPressed != true &&
-            !altActive
+            !altActive &&
+            !ctrlActive
         ) {
             val textBefore = inputConnection.getTextBeforeCursor(1, 0)
             if (textBefore?.isEmpty() == true) {

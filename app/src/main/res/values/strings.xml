@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Pastiera</string>
+    <string name="app_brand_name">Pastiera Enhanced</string>
     <string name="input_method_name">Pastiera</string>
     <string name="input_method_name_en">English</string>
     <string name="input_method_name_it">Italiano</string>
@@ -65,6 +66,10 @@
     <!-- Clear Alt on Space Section -->
     <string name="clear_alt_on_space_title">Clear Alt on Space</string>
     <string name="clear_alt_on_space_description">Automatically disable Alt or Alt-Lock when pressing Space.</string>
+    <string name="text_input_section_typing">Typing</string>
+    <string name="text_input_section_shortcuts">Shortcuts and Shortcodes</string>
+    <string name="text_input_section_modifiers">Modifiers</string>
+    <string name="text_input_section_keyboard_actions">Keyboard Actions</string>
     <string name="keymapper_modifier_guard_title">Keymapper modifier fix</string>
     <string name="keymapper_modifier_guard_description">Prevents Keymapper combos from accidentally triggering modifier latch mode. Only enable it for the modifiers used by your Keymapper shortcuts.</string>
     <string name="keymapper_guard_shift_title">Fix Keymapper Shift double-tap</string>
@@ -76,11 +81,22 @@
 
     <!-- Delete Alternatives Section -->
     <string name="delete_alternatives_title">Delete</string>
-    <string name="delete_alternatives_description">Alternative methods to delete characters to the right of cursor</string>
+    <string name="delete_alternatives_description">Choose what Shift + Backspace, Alt + Backspace, Ctrl + Backspace, and SYM + Delete do.</string>
     <string name="shift_backspace_delete_title">Shift + Backspace</string>
-    <string name="alt_backspace_delete_title">Alt + Backspace</string>
+    <string name="shift_backspace_action_title">Shift + Backspace action</string>
+    <string name="alt_backspace_delete_title">Alt + Backspace action</string>
+    <string name="ctrl_backspace_action_title">Ctrl + Backspace action</string>
+    <string name="tab_backspace_action_title">Tab + Backspace action</string>
+    <string name="sym_delete_action_title">SYM + Delete action</string>
+    <string name="alt_backspace_action_normal">Normal backspace</string>
+    <string name="alt_backspace_action_forward">Forward delete</string>
+    <string name="alt_backspace_action_word">Delete word</string>
+    <string name="alt_backspace_action_system">System / whole line</string>
+    <string name="sym_delete_action_normal">Normal delete</string>
+    <string name="change">Change</string>
+    <string name="done">Done</string>
     <string name="backspace_at_start_delete_title">Backspace at line start</string>
-    <string name="delete_alternatives_hint">Hint: Ctrl + key can be configured in Nav Mode settings</string>
+    <string name="delete_alternatives_hint">Hint: the SYM setting also applies to the F12 SYM shortcut alias.</string>
 
     <!-- Swipe Incremental Threshold Section -->
     <string name="swipe_incremental_threshold_title">Swipe Bar Sensitivity</string>

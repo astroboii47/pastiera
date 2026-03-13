@@ -14,7 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.size
@@ -104,13 +106,24 @@ fun TextInputSettingsScreen(
         mutableStateOf(SettingsManager.isTitan2LayoutEnabled(context))
     }
 
-    var shiftBackspaceDelete by remember {
-        mutableStateOf(SettingsManager.getShiftBackspaceDelete(context))
+    var shiftBackspaceAction by remember {
+        mutableStateOf(SettingsManager.getShiftBackspaceAction(context))
     }
 
-    var altBackspaceDelete by remember {
-        mutableStateOf(SettingsManager.getAltBackspaceDelete(context))
+    var altBackspaceAction by remember {
+        mutableStateOf(SettingsManager.getAltBackspaceAction(context))
     }
+    var ctrlBackspaceAction by remember {
+        mutableStateOf(SettingsManager.getCtrlBackspaceAction(context))
+    }
+    var symDeleteAction by remember {
+        mutableStateOf(SettingsManager.getSymDeleteAction(context))
+    }
+
+    var showShiftBackspaceActionDialog by remember { mutableStateOf(false) }
+    var showAltBackspaceActionDialog by remember { mutableStateOf(false) }
+    var showCtrlBackspaceActionDialog by remember { mutableStateOf(false) }
+    var showSymDeleteActionDialog by remember { mutableStateOf(false) }
 
     var backspaceAtStartDelete by remember {
         mutableStateOf(SettingsManager.getBackspaceAtStartDelete(context))
@@ -300,6 +313,14 @@ fun TextInputSettingsScreen(
                 }
             }
 
+            Text(
+                text = stringResource(R.string.text_input_section_typing),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp)
+            )
+
             // Auto Capitalize
             Surface(
                 modifier = Modifier
@@ -423,6 +444,14 @@ fun TextInputSettingsScreen(
                 }
             }
 
+            Text(
+                text = stringResource(R.string.text_input_section_shortcuts),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp)
+            )
+
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -436,7 +465,7 @@ fun TextInputSettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.TextFields,
+                        painter = painterResource(R.drawable.ic_emoji_emotions_24),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
@@ -550,45 +579,39 @@ fun TextInputSettingsScreen(
                 }
             }
 
+            Text(
+                text = stringResource(R.string.text_input_section_modifiers),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp)
+            )
+
             // Keymapper Guard
-            Surface(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .wrapContentHeight()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                Text(
+                    text = stringResource(R.string.keymapper_modifier_guard_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = stringResource(R.string.keymapper_modifier_guard_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(top = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.TextFields,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.keymapper_modifier_guard_title),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1
-                            )
-                            Text(
-                                text = stringResource(R.string.keymapper_modifier_guard_description),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2
-                            )
-                        }
-                    }
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -596,8 +619,10 @@ fun TextInputSettingsScreen(
                     ) {
                         Text(
                             text = stringResource(R.string.keymapper_guard_shift_title),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1
                         )
                         Switch(
                             checked = shiftKeymapperGuardEnabled,
@@ -615,8 +640,10 @@ fun TextInputSettingsScreen(
                     ) {
                         Text(
                             text = stringResource(R.string.keymapper_guard_ctrl_title),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1
                         )
                         Switch(
                             checked = ctrlKeymapperGuardEnabled,
@@ -634,8 +661,10 @@ fun TextInputSettingsScreen(
                     ) {
                         Text(
                             text = stringResource(R.string.keymapper_guard_alt_title),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1
                         )
                         Switch(
                             checked = altKeymapperGuardEnabled,
@@ -647,6 +676,14 @@ fun TextInputSettingsScreen(
                     }
                 }
             }
+
+            Text(
+                text = stringResource(R.string.text_input_section_keyboard_actions),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp)
+            )
 
             // Swipe to Delete
             Surface(
@@ -765,107 +802,177 @@ fun TextInputSettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Surface(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                tonalElevation = 2.dp,
-                shape = MaterialTheme.shapes.medium
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
+                Text(
+                    text = stringResource(R.string.delete_alternatives_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = stringResource(R.string.delete_alternatives_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = stringResource(R.string.delete_alternatives_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(R.string.delete_alternatives_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = stringResource(R.string.shift_backspace_delete_title),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
+                            text = stringResource(R.string.shift_backspace_action_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium
                         )
-                        Switch(
-                            checked = shiftBackspaceDelete,
-                            onCheckedChange = { enabled ->
-                                shiftBackspaceDelete = enabled
-                                SettingsManager.setShiftBackspaceDelete(context, enabled)
-                            }
+                        Text(
+                            text = when (shiftBackspaceAction) {
+                                SettingsManager.DeleteShortcutAction.NORMAL ->
+                                    stringResource(R.string.alt_backspace_action_normal)
+                                SettingsManager.DeleteShortcutAction.FORWARD_DELETE ->
+                                    stringResource(R.string.alt_backspace_action_forward)
+                                SettingsManager.DeleteShortcutAction.DELETE_WORD ->
+                                    stringResource(R.string.alt_backspace_action_word)
+                                SettingsManager.DeleteShortcutAction.SYSTEM_DEFAULT ->
+                                    stringResource(R.string.alt_backspace_action_system)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    TextButton(onClick = { showShiftBackspaceActionDialog = true }) {
+                        Text(stringResource(R.string.change))
+                    }
+                }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = stringResource(R.string.alt_backspace_delete_title),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium
                         )
-                        Switch(
-                            checked = altBackspaceDelete,
-                            onCheckedChange = { enabled ->
-                                altBackspaceDelete = enabled
-                                SettingsManager.setAltBackspaceDelete(context, enabled)
-                            }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
                         Text(
-                            text = stringResource(R.string.backspace_at_start_delete_title),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Switch(
-                            checked = backspaceAtStartDelete,
-                            onCheckedChange = { enabled ->
-                                backspaceAtStartDelete = enabled
-                                SettingsManager.setBackspaceAtStartDelete(context, enabled)
-                            }
+                            text = when (altBackspaceAction) {
+                                SettingsManager.DeleteShortcutAction.NORMAL ->
+                                    stringResource(R.string.alt_backspace_action_normal)
+                                SettingsManager.DeleteShortcutAction.FORWARD_DELETE ->
+                                    stringResource(R.string.alt_backspace_action_forward)
+                                SettingsManager.DeleteShortcutAction.DELETE_WORD ->
+                                    stringResource(R.string.alt_backspace_action_word)
+                                SettingsManager.DeleteShortcutAction.SYSTEM_DEFAULT ->
+                                    stringResource(R.string.alt_backspace_action_system)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    TextButton(onClick = { showAltBackspaceActionDialog = true }) {
+                        Text(stringResource(R.string.change))
+                    }
+                }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.ctrl_backspace_action_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = when (ctrlBackspaceAction) {
+                                SettingsManager.DeleteShortcutAction.NORMAL ->
+                                    stringResource(R.string.alt_backspace_action_normal)
+                                SettingsManager.DeleteShortcutAction.FORWARD_DELETE ->
+                                    stringResource(R.string.alt_backspace_action_forward)
+                                SettingsManager.DeleteShortcutAction.DELETE_WORD ->
+                                    stringResource(R.string.alt_backspace_action_word)
+                                SettingsManager.DeleteShortcutAction.SYSTEM_DEFAULT ->
+                                    stringResource(R.string.alt_backspace_action_system)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    TextButton(onClick = { showCtrlBackspaceActionDialog = true }) {
+                        Text(stringResource(R.string.change))
+                    }
+                }
 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.sym_delete_action_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = when (symDeleteAction) {
+                                SettingsManager.DeleteShortcutAction.NORMAL,
+                                SettingsManager.DeleteShortcutAction.FORWARD_DELETE ->
+                                    stringResource(R.string.sym_delete_action_normal)
+                                SettingsManager.DeleteShortcutAction.DELETE_WORD ->
+                                    stringResource(R.string.alt_backspace_action_word)
+                                SettingsManager.DeleteShortcutAction.SYSTEM_DEFAULT ->
+                                    stringResource(R.string.alt_backspace_action_system)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    TextButton(onClick = { showSymDeleteActionDialog = true }) {
+                        Text(stringResource(R.string.change))
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     Text(
-                        text = stringResource(R.string.delete_alternatives_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                        text = stringResource(R.string.backspace_at_start_delete_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(
+                        checked = backspaceAtStartDelete,
+                        onCheckedChange = { enabled ->
+                            backspaceAtStartDelete = enabled
+                            SettingsManager.setBackspaceAtStartDelete(context, enabled)
+                        }
                     )
                 }
+
+                Text(
+                    text = stringResource(R.string.delete_alternatives_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontStyle = FontStyle.Italic
+                )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 
@@ -949,6 +1056,200 @@ fun TextInputSettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showSnippetsTriggerDialog = false }) {
                     Text(stringResource(R.string.auto_correct_cancel))
+                }
+            }
+        )
+    }
+
+    if (showAltBackspaceActionDialog) {
+        AlertDialog(
+            onDismissRequest = { showAltBackspaceActionDialog = false },
+            title = { Text(stringResource(R.string.alt_backspace_delete_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        SettingsManager.DeleteShortcutAction.NORMAL to
+                            stringResource(R.string.alt_backspace_action_normal),
+                        SettingsManager.DeleteShortcutAction.FORWARD_DELETE to
+                            stringResource(R.string.alt_backspace_action_forward),
+                        SettingsManager.DeleteShortcutAction.DELETE_WORD to
+                            stringResource(R.string.alt_backspace_action_word),
+                        SettingsManager.DeleteShortcutAction.SYSTEM_DEFAULT to
+                            stringResource(R.string.alt_backspace_action_system)
+                    ).forEach { (action, label) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = altBackspaceAction == action,
+                                onClick = {
+                                    altBackspaceAction = action
+                                    SettingsManager.setAltBackspaceAction(context, action)
+                                    showAltBackspaceActionDialog = false
+                                }
+                            )
+                            TextButton(
+                                onClick = {
+                                    altBackspaceAction = action
+                                    SettingsManager.setAltBackspaceAction(context, action)
+                                    showAltBackspaceActionDialog = false
+                                }
+                            ) {
+                                Text(label)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAltBackspaceActionDialog = false }) {
+                    Text(stringResource(R.string.done))
+                }
+            }
+        )
+    }
+
+    if (showCtrlBackspaceActionDialog) {
+        AlertDialog(
+            onDismissRequest = { showCtrlBackspaceActionDialog = false },
+            title = { Text(stringResource(R.string.ctrl_backspace_action_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        SettingsManager.DeleteShortcutAction.NORMAL to
+                            stringResource(R.string.alt_backspace_action_normal),
+                        SettingsManager.DeleteShortcutAction.FORWARD_DELETE to
+                            stringResource(R.string.alt_backspace_action_forward),
+                        SettingsManager.DeleteShortcutAction.DELETE_WORD to
+                            stringResource(R.string.alt_backspace_action_word),
+                        SettingsManager.DeleteShortcutAction.SYSTEM_DEFAULT to
+                            stringResource(R.string.alt_backspace_action_system)
+                    ).forEach { (action, label) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = ctrlBackspaceAction == action,
+                                onClick = {
+                                    ctrlBackspaceAction = action
+                                    SettingsManager.setCtrlBackspaceAction(context, action)
+                                    showCtrlBackspaceActionDialog = false
+                                }
+                            )
+                            TextButton(
+                                onClick = {
+                                    ctrlBackspaceAction = action
+                                    SettingsManager.setCtrlBackspaceAction(context, action)
+                                    showCtrlBackspaceActionDialog = false
+                                }
+                            ) {
+                                Text(label)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showCtrlBackspaceActionDialog = false }) {
+                    Text(stringResource(R.string.done))
+                }
+            }
+        )
+    }
+
+    if (showShiftBackspaceActionDialog) {
+        AlertDialog(
+            onDismissRequest = { showShiftBackspaceActionDialog = false },
+            title = { Text(stringResource(R.string.shift_backspace_action_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        SettingsManager.DeleteShortcutAction.NORMAL to
+                            stringResource(R.string.alt_backspace_action_normal),
+                        SettingsManager.DeleteShortcutAction.FORWARD_DELETE to
+                            stringResource(R.string.alt_backspace_action_forward),
+                        SettingsManager.DeleteShortcutAction.DELETE_WORD to
+                            stringResource(R.string.alt_backspace_action_word),
+                        SettingsManager.DeleteShortcutAction.SYSTEM_DEFAULT to
+                            stringResource(R.string.alt_backspace_action_system)
+                    ).forEach { (action, label) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = shiftBackspaceAction == action,
+                                onClick = {
+                                    shiftBackspaceAction = action
+                                    SettingsManager.setShiftBackspaceAction(context, action)
+                                    showShiftBackspaceActionDialog = false
+                                }
+                            )
+                            TextButton(
+                                onClick = {
+                                    shiftBackspaceAction = action
+                                    SettingsManager.setShiftBackspaceAction(context, action)
+                                    showShiftBackspaceActionDialog = false
+                                }
+                            ) {
+                                Text(label)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showShiftBackspaceActionDialog = false }) {
+                    Text(stringResource(R.string.done))
+                }
+            }
+        )
+    }
+
+    if (showSymDeleteActionDialog) {
+        AlertDialog(
+            onDismissRequest = { showSymDeleteActionDialog = false },
+            title = { Text(stringResource(R.string.sym_delete_action_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        SettingsManager.DeleteShortcutAction.NORMAL to
+                            stringResource(R.string.sym_delete_action_normal),
+                        SettingsManager.DeleteShortcutAction.DELETE_WORD to
+                            stringResource(R.string.alt_backspace_action_word),
+                        SettingsManager.DeleteShortcutAction.SYSTEM_DEFAULT to
+                            stringResource(R.string.alt_backspace_action_system)
+                    ).forEach { (action, label) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = symDeleteAction == action,
+                                onClick = {
+                                    symDeleteAction = action
+                                    SettingsManager.setSymDeleteAction(context, action)
+                                    showSymDeleteActionDialog = false
+                                }
+                            )
+                            TextButton(
+                                onClick = {
+                                    symDeleteAction = action
+                                    SettingsManager.setSymDeleteAction(context, action)
+                                    showSymDeleteActionDialog = false
+                                }
+                            ) {
+                                Text(label)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSymDeleteActionDialog = false }) {
+                    Text(stringResource(R.string.done))
                 }
             }
         )
