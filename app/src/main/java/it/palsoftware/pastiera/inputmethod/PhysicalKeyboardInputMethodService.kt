@@ -288,6 +288,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         return keyCode == KEYCODE_SYM || keyCode == KEYCODE_SYM_SHORTCUT_ALIAS
     }
 
+    private fun isSyntheticRealSymFollowUp(keyCode: Int, event: KeyEvent?): Boolean {
+        return keyCode == KEYCODE_SYM && event?.deviceId == -1
+    }
+
     private fun isOemTabTrigger(keyCode: Int, event: KeyEvent?): Boolean {
         return keyCode == KeyEvent.KEYCODE_TAB &&
             event != null &&
@@ -991,8 +995,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         // Register listener for symbols page
         candidatesBarController.onSymbolsPageRequested = {
             ensureInputViewCreated()
-            // Toggle symbols as SYM page 2
-            symLayoutController.openSymbolsPage()
+            // Cycle SYM pages the same way as the hardware SYM/F12 trigger.
+            symLayoutController.toggleSymPage()
             updateStatusBarText()
         }
         candidatesBarController.onCloseSymRequested = {
@@ -2287,6 +2291,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
 
     override fun onKeyLongPress(keyCode_: Int, event_: KeyEvent?): Boolean {
         val (keyCode, event) = remapHardwareEvent(keyCode_, event_)
+
+        if (isSyntheticRealSymFollowUp(keyCode, event)) {
+            return true
+        }
         // Handle long press even when the keyboard is hidden but we still have a valid InputConnection.
         val inputConnection = currentInputConnection
         if (inputConnection == null) {
@@ -2319,7 +2327,23 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         if (hasEditableField && !isInputViewActive) {
             isInputViewActive = true
         }
+
+        if (hasEditableField && keyCode_ == KEYCODE_SYM && event_?.repeatCount == 0) {
+            // The OEM SYM key is intercepted by the device shortcut layer and still opens the
+            // system IME picker. Treat it as a chord-only physical hold here so Pastiera
+            // doesn't flash its own SYM popup on top of the picker.
+            cancelPendingSymToggle()
+            symPhysicallyPressed = true
+            symTogglePendingOnKeyUp = false
+            symChordUsedSinceKeyDown = false
+            return false
+        }
+
         val (keyCode, event) = remapHardwareEvent(keyCode_, event_)
+
+        if (isSyntheticRealSymFollowUp(keyCode, event)) {
+            return true
+        }
 
         // When the inline emoji picker (SYM page 4) is open, route printable hardware input
         // to the picker search field instead of the target app text field.
@@ -2397,6 +2421,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             symPhysicallyPressed = true
             symTogglePendingOnKeyUp = true
             symChordUsedSinceKeyDown = false
+            return true
         }
 
         if (
@@ -2810,6 +2835,15 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         val ic = currentInputConnection
         val inputType = info?.inputType ?: EditorInfo.TYPE_NULL
         val hasEditableField = ic != null && inputType != EditorInfo.TYPE_NULL
+
+        if (hasEditableField && keyCode_ == KEYCODE_SYM) {
+            cancelPendingSymToggle()
+            symTogglePendingOnKeyUp = false
+            symChordUsedSinceKeyDown = false
+            symPhysicallyPressed = false
+            return false
+        }
+
         val (keyCode, event) = remapHardwareEvent(keyCode_, event_)
 
         if (guardedModifierKeyUps.remove(keyCode)) {
@@ -2944,6 +2978,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                 val downTime = modifierDownTimes[keyCode] ?: 0L
                 val holdDuration = if (downTime > 0) event?.eventTime?.minus(downTime) ?: 0L else 0L
                 val isLongHold = holdDuration > 300L
+                val shortcutUsedDuringHold = otherKeyInteractedDuringHold
                 val isIntentionalHold = variationInteractedDuringHold || (isLongHold && !otherKeyInteractedDuringHold)
 
                 if (isIntentionalHold) {
@@ -2965,6 +3000,12 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                     }
                     shiftLayerLatched = capsLockEnabled
                     lastShiftTapUpTime = 0L
+                }
+                // Shift key-down enables one-shot; if Shift was used as a physically held shortcut,
+                // clear that one-shot on release so Shift doesn't remain active.
+                if (shortcutUsedDuringHold && shiftOneShot && !capsLockEnabled) {
+                    shiftOneShot = false
+                    updateStatusBarText()
                 }
                 variationInteractedDuringHold = false
                 otherKeyInteractedDuringHold = false

@@ -448,8 +448,8 @@ class StatusBarController(
                 }
                 addView(fullSuggestionsBar?.ensureView())
                 addView(modifiersContainer)
+                addView(emojiKeyboardContainer) // SYM content above the variations/status row
                 variationsWrapper?.let { addView(it) }
-                addView(emojiKeyboardContainer) // Griglia emoji prima dei LED
                 addView(ledStrip) // LED sempre in fondo
             }
             applyAccessibilitySecondRowReadPreference()
@@ -693,7 +693,10 @@ class StatusBarController(
         container.setPadding(0, 0, 0, emojiKeyboardBottomPaddingPx)
 
         // Reuse the same view to avoid flicker caused by removeAllViews()/recreate on each status update.
-        val view = emojiPickerView ?: EmojiPickerView(context).also { emojiPickerView = it }
+        val view = emojiPickerView ?: EmojiPickerView(
+            context = context,
+            onCloseRequested = { onCloseSymRequested?.invoke() }
+        ).also { emojiPickerView = it }
         val wasJustAdded = view.parent !== container
         if (wasJustAdded) {
             container.removeAllViews()
@@ -719,7 +722,8 @@ class StatusBarController(
         val view = gifPickerView ?: GifPickerView(
             context = context,
             gifClient = KlipyGifClient(context),
-            onGifSelected = { result -> onGifSelected?.invoke(result) }
+            onGifSelected = { result -> onGifSelected?.invoke(result) },
+            onCloseRequested = { onCloseSymRequested?.invoke() }
         ).also { gifPickerView = it }
         val wasJustAdded = view.parent !== container
         if (wasJustAdded) {
@@ -743,8 +747,13 @@ class StatusBarController(
      */
     private fun updateEmojiKeyboard(symMappings: Map<Int, String>, page: Int, inputConnection: android.view.inputmethod.InputConnection? = null) {
         val container = emojiKeyboardContainer ?: return
-        // Restore default padding for emoji/symbols pages.
-        container.setPadding(emojiKeyboardHorizontalPaddingPx, 0, emojiKeyboardHorizontalPaddingPx, emojiKeyboardBottomPaddingPx)
+        val topPadding = if (page == 2) dpToPx(8f) else 0
+        container.setPadding(
+            emojiKeyboardHorizontalPaddingPx,
+            topPadding,
+            emojiKeyboardHorizontalPaddingPx,
+            emojiKeyboardBottomPaddingPx
+        )
         val inputConnectionChanged = lastInputConnectionUsed != inputConnection
         val inputConnectionBecameAvailable = lastInputConnectionUsed == null && inputConnection != null
         if (lastSymPageRendered == page && lastSymMappingsRendered == symMappings && !inputConnectionChanged && !inputConnectionBecameAvailable) {
@@ -1050,6 +1059,7 @@ class StatusBarController(
             isClickable = true
             isFocusable = true
         }
+
         
         button.setOnClickListener {
             // Save current SYM page state temporarily (will be confirmed only if user presses back)
@@ -1682,19 +1692,18 @@ class StatusBarController(
         if (snapshot.clipboardOverlay) {
             // Show clipboard as dedicated overlay (not part of SYM pages)
             updateClipboardView(inputConnection)
-            variationsBar?.resetVariationsState()
 
-            // Pin background and hide variations while showing clipboard grid
+            // Pin background while showing clipboard grid, but keep the suggestions/variations row visible.
             if (layout.background !is ColorDrawable) {
                 layout.background = ColorDrawable(DEFAULT_BACKGROUND)
             }
             (layout.background as? ColorDrawable)?.alpha = 255
             variationsWrapperView?.apply {
-                visibility = View.INVISIBLE
+                visibility = View.VISIBLE
                 isEnabled = false
-                isClickable = false
+                isClickable = true
             }
-            variationsBar?.hideImmediate()
+            variationsBar?.showVariations(snapshot, inputConnection)
 
             val measured = ensureEmojiKeyboardMeasuredHeight(emojiKeyboardView, layout, forceReMeasure = true)
             val animationHeight = if (measured > 0) measured else defaultSymHeightPx
@@ -1738,19 +1747,18 @@ class StatusBarController(
             } else if (symMappings != null) {
                 updateEmojiKeyboard(symMappings, snapshot.symPage, inputConnection)
             }
-            variationsBar?.resetVariationsState()
 
-            // Pin background to opaque IME color and hide variations so SYM animates on a solid canvas.
+            // Pin background to opaque IME color, but keep the status/suggestions row visible above SYM.
             if (layout.background !is ColorDrawable) {
                 layout.background = ColorDrawable(DEFAULT_BACKGROUND)
             }
             (layout.background as? ColorDrawable)?.alpha = 255
             variationsWrapperView?.apply {
-                visibility = View.INVISIBLE // keep space to avoid shrink/flash
-                isEnabled = false
-                isClickable = false
+                visibility = View.VISIBLE
+                isEnabled = true
+                isClickable = true
             }
-            variationsBar?.hideImmediate()
+            variationsBar?.showVariations(snapshot, inputConnection)
 
             val measured = ensureEmojiKeyboardMeasuredHeight(emojiKeyboardView, layout, forceReMeasure = true)
             val symHeight = if (measured > 0) measured else defaultSymHeightPx

@@ -56,14 +56,14 @@ import java.nio.ByteBuffer
 class GifPickerView(
     context: Context,
     private val gifClient: KlipyGifClient,
-    private val onGifSelected: (KlipyGifResult) -> Unit
+    private val onGifSelected: (KlipyGifResult) -> Unit,
+    private val onCloseRequested: (() -> Unit)? = null
 ) : FrameLayout(context) {
 
     private val searchField: EditText
     private val recyclerView: RecyclerView
     private val loadingView: ProgressBar
     private val emptyView: TextView
-    private val attributionView: TextView
     private val mediaTypeTabs: LinearLayout
     private val localFolderBar: LinearLayout
     private val localFolderText: TextView
@@ -76,7 +76,7 @@ class GifPickerView(
         onGifTapped = { showPreview(it) },
         onGifLongPressed = { copyGifLink(it) }
     )
-    private val fixedHeight = dpToPx(312f)
+    private val fixedHeight = dpToPx(288f)
     private val smallPadding = dpToPx(8f)
     private val previewSpacing = dpToPx(8f)
     private val columns = 3
@@ -136,6 +136,28 @@ class GifPickerView(
             })
         }
 
+        val searchRow = FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+        val closeButtonSize = dpToPx(32f)
+        val closeButton = ImageView(context).apply {
+            setImageResource(R.drawable.ic_close_24)
+            setColorFilter(Color.WHITE)
+            contentDescription = context.getString(R.string.close)
+            layoutParams = FrameLayout.LayoutParams(closeButtonSize, closeButtonSize, Gravity.END or Gravity.CENTER_VERTICAL).apply {
+                marginEnd = smallPadding
+                topMargin = dpToPx(4f)
+            }
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { onCloseRequested?.invoke() }
+        }
+        searchRow.addView(searchField)
+        searchRow.addView(closeButton)
+
         mediaTypeTabs = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -175,8 +197,8 @@ class GifPickerView(
 
         recyclerView = RecyclerView(context).apply {
             overScrollMode = View.OVER_SCROLL_ALWAYS
-            clipToPadding = false
-            setPadding(smallPadding, smallPadding, smallPadding, smallPadding)
+            clipToPadding = true
+            setPadding(smallPadding, smallPadding, smallPadding, 0)
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 0,
@@ -211,24 +233,10 @@ class GifPickerView(
             visibility = View.GONE
         }
 
-        attributionView = TextView(context).apply {
-            text = context.getString(R.string.gif_picker_powered_by)
-            textSize = 11f
-            setTextColor(Color.argb(160, 255, 255, 255))
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(smallPadding, 0, smallPadding, smallPadding / 2)
-            }
-        }
-
-        vertical.addView(searchField)
+        vertical.addView(searchRow)
         vertical.addView(mediaTypeTabs)
         vertical.addView(localFolderBar)
         vertical.addView(recyclerView)
-        vertical.addView(attributionView)
 
         addView(vertical)
         addView(loadingView)
@@ -298,6 +306,7 @@ class GifPickerView(
 
         refresh()
     }
+
 
     fun refresh() {
         ensureActiveScope()

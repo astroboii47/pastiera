@@ -48,7 +48,8 @@ import kotlinx.coroutines.withContext
  * Emoji picker view: single vertical list with section headers and bottom tabs.
  */
 class EmojiPickerView(
-    context: Context
+    context: Context,
+    private val onCloseRequested: (() -> Unit)? = null
 ) : FrameLayout(context) {
 
     private var currentInputConnection: InputConnection? = null
@@ -62,7 +63,7 @@ class EmojiPickerView(
     private var coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var loadingJob: Job? = null
 
-    private val fixedHeight = dpToPx(177f)
+    private val fixedHeight = dpToPx(288f)
     private val emojiSize = dpToPx(48f)
     private val spacing = dpToPx(4f)
     private val smallPadding = dpToPx(8f)
@@ -143,6 +144,28 @@ class EmojiPickerView(
             }
         }
         setSearchInputCaptureEnabled(true)
+
+        val searchRow = FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+        val closeButtonSize = dpToPx(32f)
+        val closeButton = ImageView(context).apply {
+            setImageResource(R.drawable.ic_close_24)
+            setColorFilter(Color.WHITE)
+            contentDescription = context.getString(R.string.close)
+            layoutParams = FrameLayout.LayoutParams(closeButtonSize, closeButtonSize, Gravity.END or Gravity.CENTER_VERTICAL).apply {
+                marginEnd = smallPadding
+                topMargin = dpToPx(4f)
+            }
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { onCloseRequested?.invoke() }
+        }
+        searchRow.addView(searchField)
+        searchRow.addView(closeButton)
 
         // RecyclerView with headers and emoji grid
         recyclerView = RecyclerView(context).apply {
@@ -250,7 +273,7 @@ class EmojiPickerView(
         }
         tabScrollView.addView(tabRow)
 
-        vertical.addView(searchField)
+        vertical.addView(searchRow)
         vertical.addView(recyclerView)
         vertical.addView(tabScrollView)
 
