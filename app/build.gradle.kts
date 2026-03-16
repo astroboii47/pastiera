@@ -51,7 +51,7 @@ android {
     val ciVersionCode = providers.gradleProperty("PASTIERA_VERSION_CODE").orNull?.toIntOrNull()
     val ciVersionName = providers.gradleProperty("PASTIERA_VERSION_NAME").orNull
     val nightlyVersionCode = providers.gradleProperty("PASTIERA_NIGHTLY_VERSION_CODE").orNull?.toIntOrNull()
-    val forkDisplayVersionName = providers.gradleProperty("PASTIERA_ENHANCED_DISPLAY_VERSION").orNull ?: "3.0"
+    val forkDisplayVersionName = providers.gradleProperty("PASTIERA_ENHANCED_DISPLAY_VERSION").orNull ?: "3.1"
     val isFdroidBuild = gradleBooleanProperty("PASTIERA_FDROID_BUILD")
     val klipyApiKey = providers.gradleProperty("PASTIERA_KLIPY_API_KEY").orNull ?: ""
 

@@ -22,8 +22,7 @@ internal data class ReleaseInfo(
 internal fun findLatestRelease(releases: List<GitHubRelease>, releaseChannel: String): ReleaseInfo? {
     for (release in releases) {
         if (release.draft) continue
-        val matchesChannel =
-            !release.prerelease && release.tagName.lowercase().startsWith("enhanced-v")
+        val matchesChannel = !release.prerelease && isSupportedForkReleaseTag(release.tagName)
         if (!matchesChannel) continue
 
         return ReleaseInfo(
@@ -34,6 +33,11 @@ internal fun findLatestRelease(releases: List<GitHubRelease>, releaseChannel: St
     }
 
     return null
+}
+
+private fun isSupportedForkReleaseTag(tagName: String): Boolean {
+    val normalized = normalizeReleaseVersion(tagName)
+    return normalized.isNotBlank() && normalized.first().isDigit()
 }
 
 internal fun findApkDownloadUrl(assets: List<ReleaseAsset>): String? =
