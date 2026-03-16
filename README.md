@@ -8,8 +8,10 @@ It keeps Pastiera's physical-keyboard workflow and adds emoji shortcodes, a Klip
 
 ## This fork
 - Adds emoji shortcodes with inline suggestions.
+- Adds a snippets page with shortcodes 
 - Adds a Klipy-powered GIF SYM page with trending/search, animated previews, tap-to-preview before send, rich GIF send when supported, and link fallback when not.
 - Merges typing suggestions into the existing variations row instead of stacking a separate suggestions row, while keeping the left and right status buttons visible.
+- Fixes and overhauls the modifier key behaviour 
 - Tuned for Unihertz Titan 2 usage.
 
 ## Credits
