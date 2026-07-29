@@ -8,9 +8,8 @@
         android:shortcutLongLabel="@string/quick_launcher_shortcut_long">
         <intent
             android:action="it.palsoftware.pastiera.action.OPEN_QUICK_LAUNCHER"
-            android:targetPackage="${applicationId}"
+            android:targetPackage="@string/shortcut_target_package"
             android:targetClass="it.palsoftware.pastiera.QuickLauncherActionActivity" />
-        <categories android:name="android.shortcut.conversation" />
     </shortcut>
 
     <shortcut
@@ -21,7 +20,7 @@
         android:shortcutLongLabel="@string/software_keyboard_mode_toggle_shortcut_long">
         <intent
             android:action="it.palsoftware.pastiera.action.TOGGLE_SOFTWARE_KEYBOARD_MODE"
-            android:targetPackage="${applicationId}"
+            android:targetPackage="@string/shortcut_target_package"
             android:targetClass="it.palsoftware.pastiera.SoftwareKeyboardModeActionActivity" />
     </shortcut>
 </shortcuts>

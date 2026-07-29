@@ -403,6 +403,7 @@
     <string name="launcher_shortcut_assignment_no_results">No results for \"%1$s\"</string>
     <string name="launcher_shortcut_assignment_key_name">Key %1$d</string>
     <string name="quick_launcher_title">Pastiera-QuickLauncher</string>
+    <string name="shortcut_target_package">it.palsoftware.pastiera</string>
     <string name="quick_launcher_shortcut_short">Open QuickLauncher</string>
     <string name="quick_launcher_shortcut_long">Open Pastiera QuickLauncher</string>
     <string name="quick_launcher_subtitle">Type to search. Enter opens the top result.</string>
