@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="quick_launcher_open"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/quick_launcher_shortcut_short"
+        android:shortcutLongLabel="@string/quick_launcher_shortcut_long">
+        <intent
+            android:action="it.palsoftware.pastiera.action.OPEN_QUICK_LAUNCHER"
+            android:targetPackage="${applicationId}"
+            android:targetClass="it.palsoftware.pastiera.QuickLauncherActionActivity" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="software_keyboard_mode_toggle"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/software_keyboard_mode_toggle_shortcut_short"
+        android:shortcutLongLabel="@string/software_keyboard_mode_toggle_shortcut_long">
+        <intent
+            android:action="it.palsoftware.pastiera.action.TOGGLE_SOFTWARE_KEYBOARD_MODE"
+            android:targetPackage="${applicationId}"
+            android:targetClass="it.palsoftware.pastiera.SoftwareKeyboardModeActionActivity" />
+    </shortcut>
+</shortcuts>
