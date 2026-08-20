@@ -300,7 +300,17 @@ class CandidatesBarController(
         candidatesStatusBar.requestMediaTabOnNextEmojiPickerOpen()
     }
 
-    fun isMinimalUiActive(): Boolean = inputStatusBar.isMinimalUiActive()
+    fun requestMediaSearchOnNextEmojiPickerOpen(type: it.palsoftware.pastiera.inputmethod.ui.InlineMediaSearchType, query: String) {
+        inputStatusBar.requestMediaSearchOnNextEmojiPickerOpen(type, query)
+        candidatesStatusBar.requestMediaSearchOnNextEmojiPickerOpen(type, query)
+    }
+
+    fun isMinimalUiActive(): Boolean =
+        if (usesFullSoftwareKeyboard()) {
+            inputStatusBar.isMinimalUiActive()
+        } else {
+            candidatesStatusBar.isMinimalUiActive()
+        }
     
     fun invalidateStaticVariations() {
         inputStatusBar.invalidateStaticVariations()
@@ -334,6 +344,11 @@ class CandidatesBarController(
         } else {
             candidatesStatusBar.update(snapshot, emojiMapText, inputConnection, symMappings)
         }
+    }
+
+    fun updateInputConnection(inputConnection: InputConnection?) {
+        inputStatusBar.updateInputConnection(inputConnection)
+        candidatesStatusBar.updateInputConnection(inputConnection)
     }
 
     fun updateClipboardCount(count: Int) {

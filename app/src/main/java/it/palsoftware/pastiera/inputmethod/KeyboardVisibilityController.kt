@@ -40,14 +40,12 @@ class KeyboardVisibilityController(
     fun onCreateInputView(): View {
         val layout = candidatesBarController.getInputView(symLayoutController.emojiMapTextForLayout())
         detachFromParent(layout)
-        refreshStatusBar()
         return layout
     }
 
     fun onCreateCandidatesView(): View {
         val layout = candidatesBarController.getCandidatesView(symLayoutController.emojiMapTextForLayout())
         detachFromParent(layout)
-        refreshStatusBar()
         return layout
     }
 

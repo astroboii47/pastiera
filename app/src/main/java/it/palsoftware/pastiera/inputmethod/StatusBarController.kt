@@ -35,6 +35,7 @@ import it.palsoftware.pastiera.data.variation.VariationRepository
 import it.palsoftware.pastiera.gif.KlipyGifClient
 import it.palsoftware.pastiera.gif.KlipyGifResult
 import it.palsoftware.pastiera.inputmethod.ui.GifPickerView
+import it.palsoftware.pastiera.inputmethod.ui.InlineMediaSearchType
 import kotlin.math.max
 import android.view.KeyEvent
 import android.view.inputmethod.InputMethodManager
@@ -146,6 +147,10 @@ class StatusBarController(
         }
 
     var onGifPickerRequested: (() -> Unit)? = null
+        set(value) {
+            field = value
+            variationBarView?.onGifPickerRequested = value
+        }
 
     var onEmojiPageRequested: (() -> Unit)? = null
 
@@ -246,6 +251,14 @@ class StatusBarController(
         fullSuggestionsBar?.updateClipboardCount(count)
     }
 
+    fun updateInputConnection(inputConnection: android.view.inputmethod.InputConnection?) {
+        variationBarView?.updateInputConnection(inputConnection)
+        if (inputConnection !== lastHamburgerInputConnection) {
+            hideHamburgerMenu()
+            lastHamburgerInputConnection = inputConnection
+        }
+    }
+
     /**
      * Briefly highlights a suggestion slot using the original suggestion index
      * ordering (0=center, 1=right, 2=left). Used for trackpad/swipe commits.
@@ -316,6 +329,7 @@ class StatusBarController(
     private var emojiPickerView: EmojiPickerView? = null
     private var gifPickerView: GifPickerView? = null
     private var openMediaTabOnNextEmojiPickerRender = false
+    private var pendingInlineMediaSearch: Pair<InlineMediaSearchType, String>? = null
     private var emojiKeyButtons: MutableList<View> = mutableListOf()
     private var lastSymPageRendered: Int = 0
     private var lastSymMappingsRendered: Map<Int, String>? = null
@@ -443,6 +457,7 @@ class StatusBarController(
             onClipboardRequested = onClipboardRequested,
             onSpeechRecognitionRequested = onSpeechRecognitionRequested,
             onEmojiPickerRequested = onEmojiPickerRequested,
+            onEmojiMediaPickerRequested = onGifPickerRequested,
             onLanguageSwitchRequested = onLanguageSwitchRequested,
             onHamburgerMenuRequested = onHamburgerMenuRequested,
             onMinimalUiToggleRequested = { handleMinimalUiToggleFromMenu() },
@@ -829,6 +844,12 @@ class StatusBarController(
         emojiPickerView?.showMediaTab()
     }
 
+    fun requestMediaSearchOnNextEmojiPickerOpen(type: InlineMediaSearchType, query: String) {
+        pendingInlineMediaSearch = type to query
+        openMediaTabOnNextEmojiPickerRender = true
+        emojiPickerView?.showMediaSearch(type, query)
+    }
+
     private fun openSettings() {
         try {
             val intent = Intent(context, SettingsActivity::class.java).apply {
@@ -1121,6 +1142,10 @@ class StatusBarController(
         if (openMediaTabOnNextEmojiPickerRender) {
             view.showMediaTab()
             openMediaTabOnNextEmojiPickerRender = false
+        }
+        pendingInlineMediaSearch?.let { (type, query) ->
+            view.showMediaSearch(type, query)
+            pendingInlineMediaSearch = null
         }
 
         // Only scroll to top when view is just added (first open or switching pages)
@@ -2954,7 +2979,7 @@ class StatusBarController(
             return
         }
         
-        if (emojiKeyboardView.visibility == View.VISIBLE) {
+        if (emojiKeyboardView.visibility == View.VISIBLE && lastInputConnectionUsed == inputConnection) {
             animateEmojiKeyboardOut(emojiKeyboardView, layout) {
                 variationsWrapperView?.apply {
                     visibility = View.VISIBLE

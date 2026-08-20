@@ -129,6 +129,10 @@ fun TextInputSettingsScreen(
         mutableStateOf(SettingsManager.getShiftBackspaceDelete(context))
     }
 
+    var shiftBackspaceDeletePreviousWord by remember {
+        mutableStateOf(SettingsManager.getShiftBackspaceDeletePreviousWord(context))
+    }
+
     var altBackspaceDelete by remember {
         mutableStateOf(SettingsManager.getAltBackspaceDelete(context))
     }
@@ -541,6 +545,27 @@ fun TextInputSettingsScreen(
                             onCheckedChange = { enabled ->
                                 shiftBackspaceDelete = enabled
                                 SettingsManager.setShiftBackspaceDelete(context, enabled)
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = stringResource(R.string.shift_backspace_delete_previous_word_title),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = shiftBackspaceDeletePreviousWord,
+                            onCheckedChange = { enabled ->
+                                shiftBackspaceDeletePreviousWord = enabled
+                                SettingsManager.setShiftBackspaceDeletePreviousWord(context, enabled)
                             }
                         )
                     }

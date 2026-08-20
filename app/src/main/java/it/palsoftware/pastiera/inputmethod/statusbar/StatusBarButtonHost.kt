@@ -46,8 +46,10 @@ class StatusBarButtonHost(
     ): HostedButton? {
         val existing = hostedButtons[id]
         if (existing != null) {
-            if (id == StatusBarButtonId.Language) {
-                registry.getLanguageFactory().refreshLanguageText(context, existing.button)
+            when (id) {
+                StatusBarButtonId.Language -> registry.getLanguageFactory().refreshLanguageText(context, existing.button)
+                StatusBarButtonId.Emoji -> registry.getEmojiFactory().refreshCallbacks(existing.button, callbacks)
+                else -> Unit
             }
             prepareForAttach(existing, width, height)
             return existing

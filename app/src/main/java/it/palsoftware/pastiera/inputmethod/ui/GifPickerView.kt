@@ -36,6 +36,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import it.palsoftware.pastiera.R
 import it.palsoftware.pastiera.LocalMediaPickerActivity
+import it.palsoftware.pastiera.gif.GifFavoritesManager
 import it.palsoftware.pastiera.gif.KlipyGifClient
 import it.palsoftware.pastiera.gif.KlipyGifResult
 import it.palsoftware.pastiera.gif.KlipyMediaType
@@ -54,6 +55,26 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import android.widget.Toast
 import java.nio.ByteBuffer
+
+private enum class MediaPickerTab(
+    val mediaType: KlipyMediaType?,
+    val displayName: String
+) {
+    FAVORITES(null, "Favourites"),
+    GIFS(KlipyMediaType.GIF, KlipyMediaType.GIF.displayName),
+    STICKERS(KlipyMediaType.STICKER, KlipyMediaType.STICKER.displayName),
+    LOCAL(KlipyMediaType.LOCAL, KlipyMediaType.LOCAL.displayName)
+}
+
+enum class InlineMediaSearchType {
+    GIF,
+    STICKER
+}
+
+private fun MediaPickerTab.requiresApiKey(): Boolean =
+    mediaType == KlipyMediaType.GIF || mediaType == KlipyMediaType.STICKER
+
+private fun KlipyGifResult.favoriteKey(): String = "${mediaType.name}:$id"
 
 class GifPickerView(
     context: Context,
@@ -75,9 +96,11 @@ class GifPickerView(
     private val previewTitleView: TextView
     private val sendButton: TextView
     private val cancelButton: TextView
+    private val favoritesManager = GifFavoritesManager(context)
     private val resultAdapter = GifResultAdapter(
         onGifTapped = { showPreview(it) },
-        onGifLongPressed = { copyGifLink(it) }
+        onGifLongPressed = { copyGifLink(it) },
+        onFavoriteToggled = { toggleFavorite(it) }
     )
     private val fixedHeight = dpToPx(380f)
     private val smallPadding = dpToPx(6f)
@@ -89,7 +112,7 @@ class GifPickerView(
     private var searchInputCaptureEnabled = true
     private var coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var selectedGif: KlipyGifResult? = null
-    private var selectedMediaType: KlipyMediaType = KlipyMediaType.GIF
+    private var selectedMediaTab: MediaPickerTab = MediaPickerTab.GIFS
     private var currentPage = 0
     private var reachedEnd = false
     private var loadingPage = false
@@ -100,7 +123,7 @@ class GifPickerView(
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == LocalMediaPickerActivity.ACTION_FOLDER_SELECTED) {
                 updateLocalFolderBar()
-                if (selectedMediaType == KlipyMediaType.LOCAL) {
+                if (selectedMediaTab == MediaPickerTab.LOCAL) {
                     refresh()
                 }
             }
@@ -172,8 +195,8 @@ class GifPickerView(
                 setMargins(smallPadding, dpToPx(2f), smallPadding, 0)
             }
         }
-        KlipyMediaType.entries.forEach { type ->
-            mediaTypeTabs.addView(buildMediaTypeTab(type))
+        MediaPickerTab.entries.forEach { tab ->
+            mediaTypeTabs.addView(buildMediaTypeTab(tab))
         }
 
         localFolderBar = LinearLayout(context).apply {
@@ -295,7 +318,7 @@ class GifPickerView(
         cancelButton = buildPreviewButton(context.getString(R.string.gif_picker_preview_cancel)).apply {
             setOnClickListener { hidePreview() }
         }
-        sendButton = buildPreviewButton(context.getString(R.string.gif_picker_preview_send, selectedMediaType.singularName)).apply {
+        sendButton = buildPreviewButton(context.getString(R.string.gif_picker_preview_send, KlipyMediaType.GIF.singularName)).apply {
             setOnClickListener {
                 selectedGif?.let(onGifSelected)
                 hidePreview()
@@ -320,7 +343,7 @@ class GifPickerView(
     fun refresh() {
         ensureActiveScope()
         hidePreview()
-        if (selectedMediaType != KlipyMediaType.LOCAL && !gifClient.hasConfiguredApiKey()) {
+        if (selectedMediaTab.requiresApiKey() && !gifClient.hasConfiguredApiKey()) {
             showMessage(context.getString(R.string.gif_picker_missing_api_key))
             return
         }
@@ -338,7 +361,26 @@ class GifPickerView(
         searchQuery = ""
         searchField.setText("")
         hidePreview()
-        showMessage(context.getString(R.string.gif_picker_empty_prompt, selectedMediaType.displayName))
+        showMessage(context.getString(R.string.gif_picker_empty_prompt, selectedMediaTab.displayName))
+        loadFirstPage()
+    }
+
+    fun showInlineSearch(type: InlineMediaSearchType, query: String) {
+        val targetTab = when (type) {
+            InlineMediaSearchType.GIF -> MediaPickerTab.GIFS
+            InlineMediaSearchType.STICKER -> MediaPickerTab.STICKERS
+        }
+        ensureActiveScope()
+        searchJob?.cancel()
+        selectedMediaTab = targetTab
+        refreshMediaTypeTabs()
+        updateLocalFolderBar()
+        hidePreview()
+        setSearchInputCaptureEnabled(true)
+        val trimmedQuery = query.trim()
+        searchQuery = trimmedQuery
+        searchField.setText(trimmedQuery)
+        searchField.setSelection(searchField.text?.length ?: 0)
         loadFirstPage()
     }
 
@@ -422,6 +464,8 @@ class GifPickerView(
         super.onDetachedFromWindow()
         searchJob?.cancel()
         coroutineScope.cancel()
+        resultAdapter.submitList(emptyList())
+        GifPreviewLoader.clearMemory()
         if (localFolderReceiverRegistered) {
             runCatching { context.unregisterReceiver(localFolderReceiver) }
             localFolderReceiverRegistered = false
@@ -448,9 +492,22 @@ class GifPickerView(
         Toast.makeText(context, context.getString(R.string.gif_picker_link_copied, item.mediaType.singularName), Toast.LENGTH_SHORT).show()
     }
 
-    private fun buildMediaTypeTab(type: KlipyMediaType): TextView {
+    private fun toggleFavorite(item: KlipyGifResult) {
+        favoritesManager.toggleFavorite(item)
+        resultAdapter.favoriteKeys = favoriteKeys()
+        if (selectedMediaTab == MediaPickerTab.FAVORITES) {
+            refresh()
+        } else {
+            resultAdapter.notifyDataSetChanged()
+        }
+    }
+
+    private fun favoriteKeys(): Set<String> =
+        favoritesManager.getFavorites().mapTo(HashSet()) { it.favoriteKey() }
+
+    private fun buildMediaTypeTab(tab: MediaPickerTab): TextView {
         return TextView(context).apply {
-            text = type.displayName
+            text = tab.displayName
             gravity = Gravity.CENTER
             textSize = 11f
             setTextColor(Color.WHITE)
@@ -459,10 +516,10 @@ class GifPickerView(
                 marginStart = dpToPx(2f)
                 marginEnd = dpToPx(2f)
             }
-            updateMediaTypeTabStyle(this, type == selectedMediaType)
+            updateMediaTypeTabStyle(this, tab == selectedMediaTab)
             setOnClickListener {
-                if (selectedMediaType == type) return@setOnClickListener
-                selectedMediaType = type
+                if (selectedMediaTab == tab) return@setOnClickListener
+                selectedMediaTab = tab
                 refreshMediaTypeTabs()
                 updateLocalFolderBar()
                 refresh()
@@ -473,8 +530,8 @@ class GifPickerView(
     private fun refreshMediaTypeTabs() {
         for (index in 0 until mediaTypeTabs.childCount) {
             val child = mediaTypeTabs.getChildAt(index) as? TextView ?: continue
-            val type = KlipyMediaType.entries.getOrNull(index) ?: continue
-            updateMediaTypeTabStyle(child, type == selectedMediaType)
+            val tab = MediaPickerTab.entries.getOrNull(index) ?: continue
+            updateMediaTypeTabStyle(child, tab == selectedMediaTab)
         }
     }
 
@@ -484,7 +541,7 @@ class GifPickerView(
     }
 
     private fun updateLocalFolderBar() {
-        val isLocal = selectedMediaType == KlipyMediaType.LOCAL
+        val isLocal = selectedMediaTab == MediaPickerTab.LOCAL
         localFolderBar.visibility = if (isLocal) View.VISIBLE else View.GONE
         if (!isLocal) return
         val folderUri = localMediaRepository.getSelectedFolderUri()
@@ -547,7 +604,7 @@ class GifPickerView(
     }
 
     private fun maybeLoadNextPage() {
-        if (selectedMediaType == KlipyMediaType.LOCAL || loadingPage || reachedEnd || currentItems.isEmpty()) return
+        if (selectedMediaTab.mediaType == null || selectedMediaTab == MediaPickerTab.LOCAL || loadingPage || reachedEnd || currentItems.isEmpty()) return
         val layoutManager = recyclerView.layoutManager as? GridLayoutManager ?: return
         val lastVisible = layoutManager.findLastVisibleItemPosition()
         if (lastVisible >= currentItems.size - (columns * 2)) {
@@ -573,27 +630,34 @@ class GifPickerView(
         try {
             val nextPage = currentPage + 1
             val querySnapshot = searchQuery
-            val typeSnapshot = selectedMediaType
+            val tabSnapshot = selectedMediaTab
+            val typeSnapshot = tabSnapshot.mediaType
             val results = withContext(Dispatchers.IO) {
                 when {
+                    tabSnapshot == MediaPickerTab.FAVORITES && querySnapshot.isBlank() -> favoritesManager.getFavorites()
+                    tabSnapshot == MediaPickerTab.FAVORITES -> favoritesManager.getFavorites().filter {
+                        it.title.contains(querySnapshot, ignoreCase = true)
+                    }
                     typeSnapshot == KlipyMediaType.LOCAL && querySnapshot.isBlank() -> localMediaRepository.getItems()
                     typeSnapshot == KlipyMediaType.LOCAL -> localMediaRepository.getItems().filter {
                         it.title.contains(querySnapshot, ignoreCase = true)
                     }
-                    querySnapshot.isBlank() -> gifClient.trending(
+                    typeSnapshot != null && querySnapshot.isBlank() -> gifClient.trending(
                         mediaType = typeSnapshot,
                         limit = pageSize,
                         page = nextPage
                     )
-                    else -> gifClient.search(
+                    typeSnapshot != null -> gifClient.search(
                         querySnapshot,
                         mediaType = typeSnapshot,
                         limit = pageSize,
                         page = nextPage
                     )
+                    else -> emptyList()
                 }
             }
 
+            resultAdapter.favoriteKeys = favoriteKeys()
             loadingView.visibility = View.GONE
             if (reset && results.isEmpty()) {
                 currentItems = emptyList()
@@ -601,16 +665,18 @@ class GifPickerView(
                 val message = when {
                     typeSnapshot == KlipyMediaType.LOCAL && localMediaRepository.getSelectedFolderUri() == null ->
                         context.getString(R.string.local_media_choose_folder_prompt)
+                    tabSnapshot == MediaPickerTab.FAVORITES ->
+                        context.getString(R.string.gif_picker_no_favorites)
                     querySnapshot.isNotBlank() ->
-                        context.getString(R.string.gif_picker_no_results, typeSnapshot.displayName)
+                        context.getString(R.string.gif_picker_no_results, tabSnapshot.displayName)
                     else ->
-                        context.getString(R.string.gif_picker_empty_prompt, typeSnapshot.displayName)
+                        context.getString(R.string.gif_picker_empty_prompt, tabSnapshot.displayName)
                 }
                 showMessage(message)
                 return
             }
 
-            if (results.size < pageSize || typeSnapshot == KlipyMediaType.LOCAL) {
+            if (results.size < pageSize || typeSnapshot == KlipyMediaType.LOCAL || tabSnapshot == MediaPickerTab.FAVORITES) {
                 reachedEnd = true
             }
             if (results.isNotEmpty()) {
@@ -659,8 +725,10 @@ class GifPickerView(
 
 private class GifResultAdapter(
     private val onGifTapped: (KlipyGifResult) -> Unit,
-    private val onGifLongPressed: (KlipyGifResult) -> Unit
+    private val onGifLongPressed: (KlipyGifResult) -> Unit,
+    private val onFavoriteToggled: (KlipyGifResult) -> Unit
 ) : ListAdapter<KlipyGifResult, GifResultViewHolder>(GifResultDiffCallback) {
+    var favoriteKeys: Set<String> = emptySet()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): GifResultViewHolder {
         val context = parent.context
@@ -699,13 +767,34 @@ private class GifResultAdapter(
                 bottomMargin = dpToPx(context, 3f)
             }
         }
+        val favoriteButton = TextView(context).apply {
+            gravity = Gravity.CENTER
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.argb(150, 0, 0, 0))
+            layoutParams = FrameLayout.LayoutParams(
+                dpToPx(context, 26f),
+                dpToPx(context, 26f),
+                Gravity.TOP or Gravity.END
+            ).apply {
+                topMargin = dpToPx(context, 5f)
+                rightMargin = dpToPx(context, 5f)
+            }
+        }
         container.addView(preview)
         container.addView(title)
-        return GifResultViewHolder(container, preview, title, onGifTapped, onGifLongPressed)
+        container.addView(favoriteButton)
+        return GifResultViewHolder(container, preview, title, favoriteButton, onGifTapped, onGifLongPressed, onFavoriteToggled)
     }
 
     override fun onBindViewHolder(holder: GifResultViewHolder, position: Int) {
-        holder.bind(getItem(position))
+        val item = getItem(position)
+        holder.bind(item, item.favoriteKey() in favoriteKeys)
+    }
+
+    override fun onViewRecycled(holder: GifResultViewHolder) {
+        holder.clear()
+        super.onViewRecycled(holder)
     }
 }
 
@@ -713,17 +802,35 @@ private class GifResultViewHolder(
     itemView: View,
     private val previewView: ImageView,
     private val titleView: TextView,
+    private val favoriteButton: TextView,
     private val onGifTapped: (KlipyGifResult) -> Unit,
-    private val onGifLongPressed: (KlipyGifResult) -> Unit
+    private val onGifLongPressed: (KlipyGifResult) -> Unit,
+    private val onFavoriteToggled: (KlipyGifResult) -> Unit
 ) : RecyclerView.ViewHolder(itemView) {
-    fun bind(item: KlipyGifResult) {
+    fun bind(item: KlipyGifResult, isFavorite: Boolean) {
         titleView.text = item.title
         itemView.setOnClickListener { onGifTapped(item) }
         itemView.setOnLongClickListener {
             onGifLongPressed(item)
             true
         }
+        favoriteButton.visibility = if (item.isLocal || item.mediaType == KlipyMediaType.LOCAL) View.GONE else View.VISIBLE
+        favoriteButton.text = if (isFavorite) "\u2605" else "\u2606"
+        favoriteButton.contentDescription = if (isFavorite) {
+            itemView.context.getString(R.string.gif_picker_remove_favorite)
+        } else {
+            itemView.context.getString(R.string.gif_picker_add_favorite)
+        }
+        favoriteButton.setOnClickListener {
+            onFavoriteToggled(item)
+        }
         GifPreviewLoader.loadInto(previewView, item.previewUrl)
+    }
+
+    fun clear() {
+        (previewView.drawable as? Animatable)?.stop()
+        previewView.setImageDrawable(null)
+        previewView.tag = null
     }
 }
 
@@ -733,11 +840,15 @@ private object GifResultDiffCallback : DiffUtil.ItemCallback<KlipyGifResult>() {
 }
 
 private object GifPreviewLoader {
+    private const val MAX_BITMAP_CACHE_KB = 4 * 1024
+    private const val MAX_BYTE_CACHE_KB = 4 * 1024
+    private const val MAX_PREVIEW_DIMENSION_PX = 320
+
     private val okHttpClient = OkHttpClient()
-    private val bitmapCache = object : LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 1024L / 16L).toInt()) {
+    private val bitmapCache = object : LruCache<String, Bitmap>(MAX_BITMAP_CACHE_KB) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
     }
-    private val byteCache = object : LruCache<String, ByteArray>(8 * 1024) {
+    private val byteCache = object : LruCache<String, ByteArray>(MAX_BYTE_CACHE_KB) {
         override fun sizeOf(key: String, value: ByteArray): Int = value.size / 1024
     }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -770,7 +881,9 @@ private object GifPreviewLoader {
     private fun setLocalPreview(imageView: ImageView, url: String) {
         try {
             val source = ImageDecoder.createSource(imageView.context.contentResolver, Uri.parse(url))
-            val drawable = ImageDecoder.decodeDrawable(source)
+            val drawable = ImageDecoder.decodeDrawable(source) { decoder, info, _ ->
+                applyPreviewTargetSize(decoder, info.size.width, info.size.height)
+            }
             if (imageView.tag == url) {
                 imageView.setImageDrawable(drawable)
                 (drawable as? Animatable)?.start()
@@ -808,10 +921,28 @@ private object GifPreviewLoader {
     private fun decodeDrawable(bytes: ByteArray): Drawable? {
         return try {
             val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes))
-            ImageDecoder.decodeDrawable(source)
+            ImageDecoder.decodeDrawable(source) { decoder, info, _ ->
+                applyPreviewTargetSize(decoder, info.size.width, info.size.height)
+            }
         } catch (_: Exception) {
             null
         }
+    }
+
+    fun clearMemory() {
+        bitmapCache.evictAll()
+        byteCache.evictAll()
+    }
+
+    private fun applyPreviewTargetSize(decoder: ImageDecoder, width: Int, height: Int) {
+        if (width <= 0 || height <= 0) return
+        val largest = maxOf(width, height)
+        if (largest <= MAX_PREVIEW_DIMENSION_PX) return
+        val scale = largest.toFloat() / MAX_PREVIEW_DIMENSION_PX
+        decoder.setTargetSize(
+            (width / scale).toInt().coerceAtLeast(1),
+            (height / scale).toInt().coerceAtLeast(1)
+        )
     }
 }
 

@@ -80,6 +80,7 @@ class VariationBarView(
     var onLanguageSwitchRequested: (() -> Unit)? = null
     var onClipboardRequested: (() -> Unit)? = null
     var onEmojiPickerRequested: (() -> Unit)? = null
+    var onGifPickerRequested: (() -> Unit)? = null
     var onSymbolsPageRequested: (() -> Unit)? = null
     var onUndoRequested: (() -> Unit)? = null
     var onRedoRequested: (() -> Unit)? = null
@@ -482,9 +483,10 @@ class VariationBarView(
         overlayView.visibility = if (isSymModeActive) View.GONE else View.VISIBLE
         overlayView.alpha = 1f
 
-        val variationAreaVisible = statusBarVariationsEnabled
-        val rawDisplayedVariations = if (variationAreaVisible) effectiveVariations else emptyList()
-        shouldShowSwipeHint = variationAreaVisible && !staticModeEnabled && rawDisplayedVariations.isEmpty()
+        val variationAreaEnabled = statusBarVariationsEnabled
+        val rawDisplayedVariations = if (variationAreaEnabled) effectiveVariations else emptyList()
+        val variationAreaVisible = variationAreaEnabled && rawDisplayedVariations.isNotEmpty()
+        shouldShowSwipeHint = variationAreaEnabled && !staticModeEnabled && rawDisplayedVariations.isEmpty()
         updateSwipeHintVisibility(animate = true)
         val variationsChanged = rawDisplayedVariations != lastDisplayedVariations
         val inputConnectionChanged = lastInputConnectionUsed !== inputConnection
@@ -544,7 +546,7 @@ class VariationBarView(
         val hasRightButtons = rightButtonCount > 0
         
         // Calculate fixed button size from the actual amount of visible content.
-        // If variations are hidden, buttons divide the whole bar width.
+        // Empty suggestions should not reserve invisible slots.
         val reservesVariationArea = variationAreaVisible
         val dynamicSlotCount = SettingsManager.getDynamicVariationBarSlotCount(context)
         val resizeDynamicVariationsToContent = SettingsManager.getDynamicVariationBarResizeToContent(context)
@@ -638,6 +640,7 @@ class VariationBarView(
             onClipboardRequested = onClipboardRequested,
             onSpeechRecognitionRequested = onSpeechRecognitionRequested ?: { startSpeechRecognition() },
             onEmojiPickerRequested = onEmojiPickerRequested,
+            onEmojiMediaPickerRequested = onGifPickerRequested,
             onLanguageSwitchRequested = onLanguageSwitchRequested,
             onHamburgerMenuRequested = onHamburgerMenuRequested,
             onMinimalUiToggleRequested = onMinimalUiToggleRequested,

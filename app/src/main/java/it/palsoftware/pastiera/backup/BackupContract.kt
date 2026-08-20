@@ -182,6 +182,7 @@ object PreferenceSchemas {
         prefName = "pastiera_prefs",
         fixedKeys = mapOf(
             "long_press_threshold" to PreferenceValueType.LONG,
+            "physical_alt_shift_long_press_threshold" to PreferenceValueType.LONG,
             "auto_capitalize_first_letter" to PreferenceValueType.BOOLEAN,
             "double_space_to_period" to PreferenceValueType.BOOLEAN,
             "spaced_hyphen_to_en_dash" to PreferenceValueType.BOOLEAN,
@@ -234,6 +235,8 @@ object PreferenceSchemas {
             "auto_replace_on_space_enter" to PreferenceValueType.BOOLEAN,
             "auto_capitalize_after_period" to PreferenceValueType.BOOLEAN,
             "long_press_modifier" to PreferenceValueType.STRING,
+            "second_long_press_threshold" to PreferenceValueType.LONG,
+            "second_long_press_modifier" to PreferenceValueType.STRING,
             "keyboard_layout" to PreferenceValueType.STRING,
             "keyboard_layout_list" to PreferenceValueType.STRING,
             "input_style_suggestion_locales" to PreferenceValueType.STRING,

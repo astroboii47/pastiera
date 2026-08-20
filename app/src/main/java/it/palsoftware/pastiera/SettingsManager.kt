@@ -36,6 +36,7 @@ object SettingsManager {
     
     // Settings keys
     private const val KEY_LONG_PRESS_THRESHOLD = "long_press_threshold"
+    private const val KEY_PHYSICAL_ALT_SHIFT_LONG_PRESS_THRESHOLD = "physical_alt_shift_long_press_threshold"
     const val KEY_TYPING_SOUND_MODE = "typing_sound_mode"
     const val KEY_TYPING_SOUND_OUTPUT_MODE = "typing_sound_output_mode"
     const val KEY_TYPING_SOUND_CUSTOM_FILE_NAME = "typing_sound_custom_file_name"
@@ -75,6 +76,8 @@ object SettingsManager {
     private const val KEY_MAX_AUTO_REPLACE_DISTANCE = "max_auto_replace_distance"
     private const val KEY_AUTO_CAPITALIZE_AFTER_PERIOD = "auto_capitalize_after_period"
     private const val KEY_LONG_PRESS_MODIFIER = "long_press_modifier" // "alt", "shift", "variations", or "sym"
+    private const val KEY_SECOND_LONG_PRESS_THRESHOLD = "second_long_press_threshold"
+    private const val KEY_SECOND_LONG_PRESS_MODIFIER = "second_long_press_modifier" // "off", "alt", "shift", "variations", or "sym"
     private const val KEY_KEYBOARD_LAYOUT = "keyboard_layout" // "qwerty", "azerty", etc.
     private const val KEY_KEYBOARD_LAYOUT_AUTO_BY_LOCALE = "keyboard_layout_auto_by_locale" // If true, resolve layout from subtype/locale mapping
     const val KEY_KEYBOARD_LAYOUT_AUTO_MAPPING_UPDATED = "keyboard_layout_auto_mapping_updated"
@@ -83,6 +86,10 @@ object SettingsManager {
     private const val KEY_CTRL_SPACE_LAYOUT_SWITCH = "ctrl_space_layout_switch" // Enable Ctrl+Space shortcut for layout cycling
     private const val KEY_PHYSICAL_KEYBOARD_PROFILE_OVERRIDE = "physical_keyboard_profile_override" // auto | key2 | Q25 | titan | titan2 | titan2elite_qwerty | mp01
     private const val KEY_PHYSICAL_KEYBOARD_CURRENCY_SYMBOL = "physical_keyboard_currency_symbol" // Currency symbol for dedicated hardware keys
+    private const val KEY_Q25_RIGHT_SHIFT_REMAP = "q25_right_shift_remap"
+    private const val KEY_Q25_SYM_REMAP = "q25_sym_remap"
+    private const val KEY_Q25_CURRENCY_REMAP = "q25_currency_remap"
+    private const val KEY_Q25_MESSENGER_FOCUS_FIX_ENABLED = "q25_messenger_focus_fix_enabled"
     private const val KEY_RESTORE_SYM_PAGE = "restore_sym_page" // SYM page to restore when returning from settings
     private const val KEY_PENDING_RESTORE_SYM_PAGE = "pending_restore_sym_page" // Temporary SYM page state saved when opening settings
     private const val KEY_SYM_PAGES_CONFIG = "sym_pages_config" // Order/enabled pages for SYM
@@ -93,6 +100,7 @@ object SettingsManager {
     private const val KEY_SHIFT_TAP_LATCHES = "shift_tap_latches"
     private const val KEY_ALT_TAP_LATCHES = "alt_tap_latches"
     private const val KEY_CTRL_TAP_LATCHES = "ctrl_tap_latches"
+    private const val KEY_SHIFT_KEYMAPPER_GUARD_ENABLED = "shift_keymapper_guard_enabled"
     private const val KEY_ALT_LATCH_STAYS_ON_SPACE = "alt_latch_stays_on_space"
     private const val KEY_CTRL_LATCH_STAYS_ON_SPACE = "ctrl_latch_stays_on_space"
     private const val KEY_EMOJI_PICKER_EXPANDED_HEIGHT = "emoji_picker_expanded_height"
@@ -120,6 +128,7 @@ object SettingsManager {
     private const val KEY_TRACKPAD_DELETE_SWIPE_THRESHOLD = "trackpad_delete_swipe_threshold"
     private const val KEY_TRACKPAD_PROVIDER = "trackpad_provider" // shizuku | native_ime
     private const val KEY_SHIFT_BACKSPACE_DELETE = "shift_backspace_delete" // Shift + Backspace performs forward delete
+    private const val KEY_SHIFT_BACKSPACE_DELETE_PREVIOUS_WORD = "shift_backspace_delete_previous_word"
     private const val KEY_ALT_BACKSPACE_DELETE = "alt_backspace_delete" // Alt + Backspace performs forward delete
     private const val KEY_BACKSPACE_AT_START_DELETE = "backspace_at_start_delete" // Backspace at line start performs forward delete
     private const val KEY_PASTIERINA_MODE_OVERRIDE = "pastierina_mode_override" // follow_system | force_minimal | force_full
@@ -304,6 +313,8 @@ object SettingsManager {
     private const val DEFAULT_MAX_AUTO_REPLACE_DISTANCE = 1
     private const val DEFAULT_AUTO_CAPITALIZE_AFTER_PERIOD = true
     private const val DEFAULT_LONG_PRESS_MODIFIER = "alt"
+    private const val DEFAULT_SECOND_LONG_PRESS_THRESHOLD = 700L
+    private const val DEFAULT_SECOND_LONG_PRESS_MODIFIER = "off"
     private const val DEFAULT_KEYBOARD_LAYOUT = "qwerty"
     private const val DEFAULT_KEYBOARD_LAYOUT_AUTO_BY_LOCALE = true
     private const val DEFAULT_ALT_SHIFT_LAYOUT_SWITCH = true
@@ -316,9 +327,19 @@ object SettingsManager {
     private const val DEFAULT_SOFTWARE_KEYBOARD_LONG_PRESS_LAYER_POPUP_BELOW_KEY = true
     private const val DEFAULT_PHYSICAL_KEYBOARD_PROFILE_OVERRIDE = "auto"
     private const val DEFAULT_PHYSICAL_KEYBOARD_CURRENCY_SYMBOL = "€"
+    const val Q25_REMAP_ORIGINAL = "original"
+    const val Q25_REMAP_SHIFT = "shift"
+    const val Q25_REMAP_ALT = "alt"
+    const val Q25_REMAP_CTRL = "ctrl"
+    const val Q25_REMAP_SYM = "sym"
+    private const val DEFAULT_Q25_RIGHT_SHIFT_REMAP = Q25_REMAP_CTRL
+    private const val DEFAULT_Q25_SYM_REMAP = Q25_REMAP_SYM
+    private const val DEFAULT_Q25_CURRENCY_REMAP = Q25_REMAP_ORIGINAL
+    private const val DEFAULT_Q25_MESSENGER_FOCUS_FIX_ENABLED = false
     private const val DEFAULT_SYM_AUTO_CLOSE = true
     private const val DEFAULT_SYM_AUTO_CLOSE_ON_TOUCH = true
     private const val DEFAULT_MODIFIER_TAP_LATCHES = false
+    private const val DEFAULT_KEYMAPPER_GUARD_ENABLED = false
     private const val DEFAULT_MODIFIER_LATCH_STAYS_ON_SPACE = false
     private const val DEFAULT_BOUNCE_KEYS_ENABLED = false
     private const val DEFAULT_BOUNCE_KEYS_DELAY_MS = 80L
@@ -370,6 +391,7 @@ object SettingsManager {
         SWIPE_TO_DELETE_PROVIDER_NATIVE_IME
     )
     private const val DEFAULT_SHIFT_BACKSPACE_DELETE = false
+    private const val DEFAULT_SHIFT_BACKSPACE_DELETE_PREVIOUS_WORD = false
     private const val DEFAULT_ALT_BACKSPACE_DELETE = false
     private const val DEFAULT_BACKSPACE_AT_START_DELETE = false
     private const val DEFAULT_ACCESSIBILITY_LIVE_ANNOUNCEMENTS_ENABLED = false
@@ -1508,6 +1530,20 @@ object SettingsManager {
             .apply()
     }
 
+    fun getPhysicalAltShiftLongPressThreshold(context: Context): Long {
+        return getPreferences(context).getLong(
+            KEY_PHYSICAL_ALT_SHIFT_LONG_PRESS_THRESHOLD,
+            getLongPressThreshold(context)
+        ).coerceIn(MIN_LONG_PRESS_THRESHOLD, MAX_LONG_PRESS_THRESHOLD)
+    }
+
+    fun setPhysicalAltShiftLongPressThreshold(context: Context, threshold: Long) {
+        val clampedValue = threshold.coerceIn(MIN_LONG_PRESS_THRESHOLD, MAX_LONG_PRESS_THRESHOLD)
+        getPreferences(context).edit()
+            .putLong(KEY_PHYSICAL_ALT_SHIFT_LONG_PRESS_THRESHOLD, clampedValue)
+            .apply()
+    }
+
     fun getShiftTapLatches(context: Context): Boolean {
         return getPreferences(context).getBoolean(
             KEY_SHIFT_TAP_LATCHES,
@@ -1545,6 +1581,13 @@ object SettingsManager {
         getPreferences(context).edit()
             .putBoolean(KEY_CTRL_TAP_LATCHES, enabled)
             .apply()
+    }
+
+    fun getShiftKeymapperGuardEnabled(context: Context): Boolean {
+        return getPreferences(context).getBoolean(
+            KEY_SHIFT_KEYMAPPER_GUARD_ENABLED,
+            DEFAULT_KEYMAPPER_GUARD_ENABLED
+        )
     }
 
     fun getAltLatchStaysOnSpace(context: Context): Boolean {
@@ -1587,6 +1630,12 @@ object SettingsManager {
      * Returns the default value for the long-press threshold.
      */
     fun getDefaultLongPressThreshold(): Long = DEFAULT_LONG_PRESS_THRESHOLD
+
+    fun getMinSecondLongPressThreshold(): Long = MIN_LONG_PRESS_THRESHOLD
+
+    fun getMaxSecondLongPressThreshold(): Long = 2000L
+
+    fun getDefaultSecondLongPressThreshold(): Long = DEFAULT_SECOND_LONG_PRESS_THRESHOLD
 
     fun getTypingSoundMode(context: Context): String {
         val mode = getPreferences(context).getString(KEY_TYPING_SOUND_MODE, DEFAULT_TYPING_SOUND_MODE)
@@ -2379,6 +2428,19 @@ object SettingsManager {
     fun setShiftBackspaceDelete(context: Context, enabled: Boolean) {
         getPreferences(context).edit()
             .putBoolean(KEY_SHIFT_BACKSPACE_DELETE, enabled)
+            .apply()
+    }
+
+    fun getShiftBackspaceDeletePreviousWord(context: Context): Boolean {
+        return getPreferences(context).getBoolean(
+            KEY_SHIFT_BACKSPACE_DELETE_PREVIOUS_WORD,
+            DEFAULT_SHIFT_BACKSPACE_DELETE_PREVIOUS_WORD
+        )
+    }
+
+    fun setShiftBackspaceDeletePreviousWord(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_SHIFT_BACKSPACE_DELETE_PREVIOUS_WORD, enabled)
             .apply()
     }
 
@@ -3198,6 +3260,46 @@ object SettingsManager {
         }
         getPreferences(context).edit()
             .putString(KEY_LONG_PRESS_MODIFIER, validModifier)
+            .apply()
+    }
+
+    fun getSecondLongPressThreshold(context: Context): Long {
+        return getPreferences(context).getLong(
+            KEY_SECOND_LONG_PRESS_THRESHOLD,
+            DEFAULT_SECOND_LONG_PRESS_THRESHOLD
+        ).coerceIn(getMinSecondLongPressThreshold(), getMaxSecondLongPressThreshold())
+    }
+
+    fun setSecondLongPressThreshold(context: Context, threshold: Long) {
+        getPreferences(context).edit()
+            .putLong(
+                KEY_SECOND_LONG_PRESS_THRESHOLD,
+                threshold.coerceIn(getMinSecondLongPressThreshold(), getMaxSecondLongPressThreshold())
+            )
+            .apply()
+    }
+
+    fun getSecondLongPressModifier(context: Context): String {
+        val stored = getPreferences(context).getString(
+            KEY_SECOND_LONG_PRESS_MODIFIER,
+            DEFAULT_SECOND_LONG_PRESS_MODIFIER
+        ) ?: DEFAULT_SECOND_LONG_PRESS_MODIFIER
+        return when (stored) {
+            "off", "alt", "shift", "variations", "sym" -> stored
+            else -> DEFAULT_SECOND_LONG_PRESS_MODIFIER
+        }
+    }
+
+    fun setSecondLongPressModifier(context: Context, modifier: String) {
+        val validModifier = when (modifier) {
+            "alt" -> "alt"
+            "shift" -> "shift"
+            "variations" -> "variations"
+            "sym" -> "sym"
+            else -> "off"
+        }
+        getPreferences(context).edit()
+            .putString(KEY_SECOND_LONG_PRESS_MODIFIER, validModifier)
             .apply()
     }
     
@@ -4224,6 +4326,58 @@ object SettingsManager {
             .apply()
     }
 
+    fun getQ25RightShiftRemap(context: Context): String =
+        getQ25ModifierRemap(context, KEY_Q25_RIGHT_SHIFT_REMAP, DEFAULT_Q25_RIGHT_SHIFT_REMAP)
+
+    fun setQ25RightShiftRemap(context: Context, remap: String) {
+        setQ25ModifierRemap(context, KEY_Q25_RIGHT_SHIFT_REMAP, remap)
+    }
+
+    fun getQ25SymRemap(context: Context): String =
+        getQ25ModifierRemap(context, KEY_Q25_SYM_REMAP, DEFAULT_Q25_SYM_REMAP)
+
+    fun setQ25SymRemap(context: Context, remap: String) {
+        setQ25ModifierRemap(context, KEY_Q25_SYM_REMAP, remap)
+    }
+
+    fun getQ25CurrencyRemap(context: Context): String =
+        getQ25ModifierRemap(context, KEY_Q25_CURRENCY_REMAP, DEFAULT_Q25_CURRENCY_REMAP)
+
+    fun setQ25CurrencyRemap(context: Context, remap: String) {
+        setQ25ModifierRemap(context, KEY_Q25_CURRENCY_REMAP, remap)
+    }
+
+    fun getQ25MessengerFocusFixEnabled(context: Context): Boolean =
+        getPreferences(context).getBoolean(
+            KEY_Q25_MESSENGER_FOCUS_FIX_ENABLED,
+            DEFAULT_Q25_MESSENGER_FOCUS_FIX_ENABLED
+        )
+
+    fun setQ25MessengerFocusFixEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_Q25_MESSENGER_FOCUS_FIX_ENABLED, enabled)
+            .apply()
+    }
+
+    fun q25ModifierRemapOptions(): List<String> = listOf(
+        Q25_REMAP_ORIGINAL,
+        Q25_REMAP_SHIFT,
+        Q25_REMAP_ALT,
+        Q25_REMAP_CTRL,
+        Q25_REMAP_SYM
+    )
+
+    private fun getQ25ModifierRemap(context: Context, key: String, defaultValue: String): String {
+        val stored = getPreferences(context).getString(key, defaultValue) ?: defaultValue
+        return normalizeQ25ModifierRemap(stored, defaultValue)
+    }
+
+    private fun setQ25ModifierRemap(context: Context, key: String, remap: String) {
+        getPreferences(context).edit()
+            .putString(key, normalizeQ25ModifierRemap(remap, Q25_REMAP_ORIGINAL))
+            .apply()
+    }
+
     /**
      * Returns whether Alt+Shift shortcut for keyboard layout cycling is enabled.
      */
@@ -4293,6 +4447,11 @@ object SettingsManager {
             normalized.equals("mp01", ignoreCase = true) -> "mp01"
             else -> DEFAULT_PHYSICAL_KEYBOARD_PROFILE_OVERRIDE
         }
+    }
+
+    private fun normalizeQ25ModifierRemap(remap: String?, defaultValue: String): String {
+        val normalized = remap?.trim()?.lowercase().orEmpty()
+        return if (normalized in q25ModifierRemapOptions()) normalized else defaultValue
     }
 
     private fun normalizePhysicalKeyboardCurrencySymbol(symbol: String?): String {

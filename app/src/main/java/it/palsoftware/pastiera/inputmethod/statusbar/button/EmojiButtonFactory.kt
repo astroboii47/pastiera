@@ -19,14 +19,22 @@ class EmojiButtonFactory : StatusBarButtonFactory {
 
     override fun create(context: Context, size: Int, callbacks: StatusBarCallbacks): ButtonCreationResult {
         val button = createButton(context, size)
-        
-        // Set up click listener using the emoji-specific callback
+        refreshCallbacks(button, callbacks)
+        return ButtonCreationResult(view = button)
+    }
+
+    fun refreshCallbacks(button: View, callbacks: StatusBarCallbacks) {
         button.setOnClickListener {
             button.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
             callbacks.onEmojiPickerRequested?.invoke()
         }
-        
-        return ButtonCreationResult(view = button)
+        button.setOnLongClickListener {
+            button.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            callbacks.onEmojiMediaPickerRequested?.invoke()
+            button.isPressed = false
+            button.refreshDrawableState()
+            true
+        }
     }
     
     override fun update(view: View, state: ButtonState) {

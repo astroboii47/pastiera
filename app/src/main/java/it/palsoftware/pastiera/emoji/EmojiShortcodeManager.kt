@@ -78,6 +78,12 @@ class EmojiShortcodeManager(private val context: Context) {
         if (textBeforeCursor.isEmpty()) return null
         val lastColonIndex = textBeforeCursor.lastIndexOf(':')
         if (lastColonIndex == -1) return null
+        if (lastColonIndex > 0) {
+            val previousChar = textBeforeCursor[lastColonIndex - 1]
+            if (!previousChar.isWhitespace() && previousChar !in "([{\"'") {
+                return null
+            }
+        }
         val afterColon = textBeforeCursor.substring(lastColonIndex + 1)
         if (!afterColon.matches(SHORTCODE_REGEX) || afterColon.length > 30) {
             return null

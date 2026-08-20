@@ -75,6 +75,9 @@ data class StatusBarCallbacks(
     
     /** Called when emoji button is clicked */
     val onEmojiPickerRequested: (() -> Unit)? = null,
+
+    /** Called when emoji button is long-pressed */
+    val onEmojiMediaPickerRequested: (() -> Unit)? = null,
     
     /** Called when language button is clicked */
     val onLanguageSwitchRequested: (() -> Unit)? = null,

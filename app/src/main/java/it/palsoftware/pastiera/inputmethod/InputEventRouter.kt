@@ -41,7 +41,7 @@ class InputEventRouter(
     private val restrictedFieldBasicCtrlActions = setOf("select_all", "copy", "cut", "paste")
 
     var suggestionController: it.palsoftware.pastiera.core.suggestions.SuggestionController? = null
-    var onCommitText: (() -> Unit)? = null
+    var onCommitText: ((CharSequence) -> Unit)? = null
 
     private fun isSuggestionDebugLoggingEnabled(): Boolean =
         SettingsManager.isSuggestionDebugLoggingEnabled(context)
@@ -81,7 +81,7 @@ class InputEventRouter(
         if (isSuggestionDebugLoggingEnabled()) {
             Log.d("PastieraIME", "commitTextWithTracking enter: '$text', trackWord=$trackWord")
         }
-        onCommitText?.invoke()
+        onCommitText?.invoke(text)
         ic?.commitText(text, 1)
         if (trackWord) {
             if (isSuggestionDebugLoggingEnabled()) {
@@ -305,8 +305,13 @@ class InputEventRouter(
         if (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
             if (!params.shiftPressed) {
                 val wasShiftOneShot = controllers.modifierStateController.shiftOneShot
+                val wasCapsLock = controllers.modifierStateController.capsLockEnabled
                 val result = controllers.modifierStateController.handleShiftKeyDown(keyCode)
-                if (wasShiftOneShot && !controllers.modifierStateController.shiftOneShot) {
+                if (
+                    (wasShiftOneShot || wasCapsLock) &&
+                    !controllers.modifierStateController.shiftOneShot &&
+                    !controllers.modifierStateController.capsLockEnabled
+                ) {
                     callbacks.onShiftOneShotToggledOff()
                 }
                 if (result.shouldUpdateStatusBar) {
@@ -458,7 +463,15 @@ class InputEventRouter(
         }
 
         if (!passThroughAltBoundary && (event?.isAltPressed == true || altLatchActive || altOneShotActive)) {
-            controllers.altSymManager.cancelPendingLongPress(keyCode)
+            val physicalAltShiftLongPress =
+                event?.isAltPressed == true &&
+                    !altLatchActive &&
+                    !altOneShotActive &&
+                    keyCode != KeyEvent.KEYCODE_BACK &&
+                    controllers.altSymManager.getAltMapping(keyCode) != null
+            if (!physicalAltShiftLongPress) {
+                controllers.altSymManager.cancelPendingLongPress(keyCode)
+            }
             if (altOneShotActive) {
                 callbacks.clearAltOneShot()
                 callbacks.refreshStatusBar()
@@ -475,6 +488,7 @@ class InputEventRouter(
                     event = event,
                     inputConnection = ic,
                     altSymManager = controllers.altSymManager,
+                    physicalAltShiftLongPress = physicalAltShiftLongPress,
                     updateStatusBar = callbacks.updateStatusBar,
                     callSuperWithKey = callbacks.callSuperWithKey
                 )
@@ -508,12 +522,16 @@ class InputEventRouter(
         }
 
         val mapping = callbacks.getMapping(keyCode)
+        val trustedShiftActive = params.shiftPressed ||
+            params.shiftLayerLatched ||
+            shiftOneShotActive ||
+            params.capsLockEnabled
         val resolvedUppercase = mapping?.let {
             when {
                 shiftOneShotActive -> true
                 params.shiftLayerLatched -> true
-                params.capsLockEnabled && event?.isShiftPressed != true -> true
-                event?.isShiftPressed == true -> true
+                params.capsLockEnabled -> true
+                params.shiftPressed -> true
                 else -> false
             }
         } ?: false
@@ -521,8 +539,7 @@ class InputEventRouter(
         // Compute long-press eligibility up front so multi-tap can still schedule it.
         val longPressSuppressed = callbacks.isLongPressSuppressed(keyCode)
         val longPressMode = SettingsManager.getLongPressModifier(context)
-        val effectiveShiftForLongPress =
-            event?.isShiftPressed == true || shiftOneShotActive || params.shiftLayerLatched
+        val effectiveShiftForLongPress = trustedShiftActive
         val charForLongPress = if (LayoutMappingRepository.isMapped(keyCode)) {
             LayoutMappingRepository.getCharacterWithModifiers(
                 keyCode,
@@ -667,7 +684,7 @@ class InputEventRouter(
         if (shiftOneShotActive) {
             val char = LayoutMappingRepository.getCharacterStringWithModifiers(
                 keyCode,
-                event?.isShiftPressed == true,
+                params.shiftPressed,
                 params.capsLockEnabled,
                 true
             )
@@ -684,7 +701,7 @@ class InputEventRouter(
         if (params.capsLockEnabled && LayoutMappingRepository.isMapped(keyCode)) {
             val char = LayoutMappingRepository.getCharacterStringWithModifiers(
                 keyCode,
-                event?.isShiftPressed == true,
+                params.shiftPressed,
                 params.capsLockEnabled,
                 false
             )
@@ -742,7 +759,12 @@ class InputEventRouter(
         // suggestion pipeline can still work even when the key is not
         // covered by the current layout mappings.
         if (ic != null && event != null && event.unicodeChar != 0) {
-            val ch = event.unicodeChar.toChar()
+            val raw = event.unicodeChar.toChar()
+            val ch = if (raw.isLetter()) {
+                if (trustedShiftActive) raw.uppercaseChar() else raw.lowercaseChar()
+            } else {
+                raw
+            }
             if (ch.isLetter()) {
                 if (isSuggestionDebugLoggingEnabled()) {
                     Log.d("PastieraIME", "fallback commit: '$ch'")
@@ -777,9 +799,16 @@ class InputEventRouter(
         val shiftTrigger =
             SettingsManager.getShiftBackspaceDelete(context) &&
             event?.isShiftPressed == true
+        val shiftDeletePreviousWordTrigger =
+            SettingsManager.getShiftBackspaceDeletePreviousWord(context) &&
+            event?.isShiftPressed == true
         val altTrigger =
             SettingsManager.getAltBackspaceDelete(context) &&
             altActive
+
+        if (shiftDeletePreviousWordTrigger) {
+            return TextSelectionHelper.deleteLastWord(inputConnection)
+        }
 
         if (shiftTrigger || altTrigger) {
             inputConnection.deleteSurroundingText(0, 1)
@@ -1155,6 +1184,7 @@ class InputEventRouter(
         event: KeyEvent?,
         inputConnection: InputConnection?,
         altSymManager: AltSymManager,
+        physicalAltShiftLongPress: Boolean = false,
         updateStatusBar: () -> Unit,
         callSuperWithKey: (Int, KeyEvent?) -> Boolean
     ): Boolean {
@@ -1177,6 +1207,16 @@ class InputEventRouter(
         }
 
         if (result) {
+            if (physicalAltShiftLongPress) {
+                altSymManager.getAltMapping(keyCode)?.let { insertedAltText ->
+                    altSymManager.schedulePhysicalAltShiftLongPress(
+                        keyCode = keyCode,
+                        inputConnection = ic,
+                        insertedChar = insertedAltText,
+                        shiftedFromAltChar = event?.isShiftPressed == true
+                    )
+                }
+            }
             updateStatusBar()
         }
         return result

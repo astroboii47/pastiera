@@ -22,28 +22,49 @@ class ModifierStateController(
         var state: ShiftState = ShiftState.OFF
             private set
 
-        private var lastTapTime: Long = 0
+        private var lastReleaseTime: Long = 0
+        private var armNextReleaseForDoubleTap: Boolean = false
 
         fun tap(
             now: Long = System.currentTimeMillis(),
             isConsecutiveTap: Boolean,
             singleTapLatches: Boolean = false
         ): ShiftState {
-            val doubleTap = isConsecutiveTap && now - lastTapTime < doubleTapThreshold
-            lastTapTime = now
+            val previous = state
+            val doubleTap = isConsecutiveTap &&
+                lastReleaseTime > 0 &&
+                now - lastReleaseTime < doubleTapThreshold
             state = when {
+                state == ShiftState.CAPS -> ShiftState.OFF
                 doubleTap -> if (state == ShiftState.CAPS) ShiftState.OFF else ShiftState.CAPS
                 singleTapLatches -> if (state == ShiftState.CAPS) ShiftState.OFF else ShiftState.CAPS
                 state == ShiftState.OFF -> ShiftState.ONE_SHOT
                 else -> ShiftState.OFF
             }
+            armNextReleaseForDoubleTap = previous == ShiftState.OFF &&
+                state == ShiftState.ONE_SHOT &&
+                !singleTapLatches
+            if (!armNextReleaseForDoubleTap) {
+                lastReleaseTime = 0
+            }
             return state
+        }
+
+        fun release(now: Long = System.currentTimeMillis()) {
+            if (armNextReleaseForDoubleTap) {
+                lastReleaseTime = now
+            } else {
+                lastReleaseTime = 0
+            }
+            armNextReleaseForDoubleTap = false
         }
 
         fun requestOneShot(): Boolean {
             if (state == ShiftState.CAPS) {
                 return false
             }
+            lastReleaseTime = 0
+            armNextReleaseForDoubleTap = false
             if (state != ShiftState.ONE_SHOT) {
                 state = ShiftState.ONE_SHOT
                 return true
@@ -54,6 +75,8 @@ class ModifierStateController(
         fun consumeOneShot(): Boolean {
             return if (state == ShiftState.ONE_SHOT) {
                 state = ShiftState.OFF
+                lastReleaseTime = 0
+                armNextReleaseForDoubleTap = false
                 true
             } else {
                 false
@@ -62,15 +85,20 @@ class ModifierStateController(
 
         fun setCapsLock(enabled: Boolean) {
             state = if (enabled) ShiftState.CAPS else ShiftState.OFF
+            lastReleaseTime = 0
+            armNextReleaseForDoubleTap = false
         }
 
         fun restore(newState: ShiftState) {
             state = newState
+            lastReleaseTime = 0
+            armNextReleaseForDoubleTap = false
         }
 
         fun reset() {
             state = ShiftState.OFF
-            lastTapTime = 0
+            lastReleaseTime = 0
+            armNextReleaseForDoubleTap = false
         }
     }
 
@@ -254,6 +282,7 @@ class ModifierStateController(
 
         shiftPressedFlag = false
         shiftPhysicallyPressedFlag = false
+        shiftStateMachine.release()
         return ModifierKeyHandler.ModifierKeyResult(shouldUpdateStatusBar = true)
     }
 

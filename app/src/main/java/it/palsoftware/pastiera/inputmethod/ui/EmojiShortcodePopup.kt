@@ -47,7 +47,7 @@ class EmojiShortcodePopup(
         false
     ).apply {
         setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        isOutsideTouchable = false
+        isOutsideTouchable = true
         isTouchable = true
         isFocusable = false
         elevation = 8f
@@ -123,7 +123,7 @@ class EmojiShortcodePopup(
     fun handlePhysicalKey(keyCode: Int, event: KeyEvent?): Boolean {
         if (suggestions.isEmpty()) return false
         when (keyCode) {
-            KeyEvent.KEYCODE_ESCAPE -> {
+            KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_BACK -> {
                 dismiss()
                 return true
             }

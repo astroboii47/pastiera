@@ -94,7 +94,10 @@ class MainActivity : LocalizedComponentActivity() {
         val remapped = DeviceSpecific.remapHardwareKeyEvent(
             keyCode,
             event,
-            SettingsManager.getPhysicalKeyboardProfileOverride(this)
+            SettingsManager.getPhysicalKeyboardProfileOverride(this),
+            q25RightShiftRemap = SettingsManager.getQ25RightShiftRemap(this),
+            q25SymRemap = SettingsManager.getQ25SymRemap(this),
+            q25CurrencyRemap = SettingsManager.getQ25CurrencyRemap(this)
         )
         return remapped.keyCode to remapped.event
     }

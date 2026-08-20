@@ -45,6 +45,7 @@ object DeviceSpecific {
     private const val KEYCODE_SYM: Int = KeyEvent.KEYCODE_SYM
     private const val KEYCODE_Q25_CTRL: Int = KeyEvent.KEYCODE_SHIFT_RIGHT
     private const val KEYCODE_Q25_SYM: Int = KeyEvent.KEYCODE_ALT_RIGHT
+    private const val SCANCODE_Q25_CURRENCY_HOLD: Int = 0x1d
     private const val SCANCODE_KEY2_W: Int = 17
     private const val SCANCODE_KEY2_Z: Int = 44
     private const val SCANCODE_KEY2_M: Int = 50
@@ -67,16 +68,26 @@ object DeviceSpecific {
     private const val META_SYM: Int = KeyEvent.META_SYM_ON
 
     private var lastQ25MetaState: Int = 0
+    private var q25CurrencyHoldActive: Boolean = false
 
     fun needsRemapping(): Boolean = currentDeviceProfile().needsEventRemapping
 
     fun remapHardwareKeyEvent(
         keyCode: Int,
         event: KeyEvent?,
-        physicalProfileOverride: String? = null
+        physicalProfileOverride: String? = null,
+        q25RightShiftRemap: String = "ctrl",
+        q25SymRemap: String = "sym",
+        q25CurrencyRemap: String = "original"
     ): RemappedHardwareEvent {
         return when (resolveKeyboardModel(physicalProfileOverride)) {
-            KeyboardModel.Q25 -> remapQ25KeyEvent(keyCode, event)
+            KeyboardModel.Q25 -> remapQ25KeyEvent(
+                keyCode = keyCode,
+                event = event,
+                rightShiftRemap = q25RightShiftRemap,
+                symRemap = q25SymRemap,
+                currencyRemap = q25CurrencyRemap
+            )
             KeyboardModel.KEY2 -> remapKey2KeyEvent(keyCode, event)
             else -> RemappedHardwareEvent(keyCode, event)
         }
@@ -95,21 +106,36 @@ object DeviceSpecific {
         return remapped.keyCode to remapped.event
     }
 
-    private fun remapQ25KeyEvent(keyCode: Int, event: KeyEvent?): RemappedHardwareEvent {
+    private fun remapQ25KeyEvent(
+        keyCode: Int,
+        event: KeyEvent?,
+        rightShiftRemap: String,
+        symRemap: String,
+        currencyRemap: String
+    ): RemappedHardwareEvent {
+        val currencyHoldEvent = isQ25CurrencyHoldEvent(keyCode, event, currencyRemap)
+        if (currencyHoldEvent && event?.action == KeyEvent.ACTION_DOWN) {
+            q25CurrencyHoldActive = true
+        }
         if (!shouldRemapQ25Event(keyCode, event)) {
             return RemappedHardwareEvent(keyCode, event)
         }
 
         val normalizedKeyCode = when (keyCode) {
-            KEYCODE_Q25_CTRL -> KEYCODE_CTRL
-            KEYCODE_Q25_SYM -> KEYCODE_SYM
+            KEYCODE_Q25_CTRL -> q25TargetKeyCode(rightShiftRemap, keyCode)
+            KEYCODE_Q25_SYM -> q25TargetKeyCode(if (currencyHoldEvent) currencyRemap else symRemap, keyCode)
+            KeyEvent.KEYCODE_GRAVE -> q25TargetKeyCode(currencyRemap, keyCode)
             else -> keyCode
         }
 
-        return RemappedHardwareEvent(
+        val remapped = RemappedHardwareEvent(
             keyCode = normalizedKeyCode,
-            event = patchQ25MetaState(event)
+            event = patchQ25MetaState(event, rightShiftRemap, symRemap, currencyRemap)
         )
+        if (currencyHoldEvent && event?.action == KeyEvent.ACTION_UP) {
+            q25CurrencyHoldActive = false
+        }
+        return remapped
     }
 
     private fun remapKey2KeyEvent(keyCode: Int, event: KeyEvent?): RemappedHardwareEvent {
@@ -147,7 +173,10 @@ object DeviceSpecific {
     }
 
     private fun shouldRemapQ25Event(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KEYCODE_Q25_CTRL || keyCode == KEYCODE_Q25_SYM) {
+        if (keyCode == KEYCODE_Q25_CTRL || keyCode == KEYCODE_Q25_SYM || keyCode == KeyEvent.KEYCODE_GRAVE) {
+            return true
+        }
+        if (q25CurrencyHoldActive) {
             return true
         }
         if (event == null) {
@@ -157,23 +186,34 @@ object DeviceSpecific {
         return (combinedMetaState and META_Q25_CTRL_OR_SYM) != 0
     }
 
-    private fun patchQ25MetaState(event: KeyEvent?): KeyEvent? {
+    private fun patchQ25MetaState(
+        event: KeyEvent?,
+        rightShiftRemap: String,
+        symRemap: String,
+        currencyRemap: String
+    ): KeyEvent? {
         if (event == null) {
             return null
         }
 
         val currentMetaState = event.metaState
         val combinedMetaState = currentMetaState or lastQ25MetaState
-        if ((combinedMetaState and META_Q25_CTRL_OR_SYM) == 0) {
+        val remapsDedicatedCurrencyKey = event.keyCode == KeyEvent.KEYCODE_GRAVE &&
+            currencyRemap != "original"
+        if ((combinedMetaState and META_Q25_CTRL_OR_SYM) == 0 && !remapsDedicatedCurrencyKey && !q25CurrencyHoldActive) {
             lastQ25MetaState = currentMetaState
             return event
         }
         lastQ25MetaState = currentMetaState
 
-        val normalizedMetaState = rebuildNormalizedMetaState(currentMetaState)
+        val normalizedMetaState = rebuildNormalizedMetaState(currentMetaState, rightShiftRemap, symRemap, currencyRemap)
         val normalizedKeyCode = when (event.keyCode) {
-            KEYCODE_Q25_CTRL -> KEYCODE_CTRL
-            KEYCODE_Q25_SYM -> KEYCODE_SYM
+            KEYCODE_Q25_CTRL -> q25TargetKeyCode(rightShiftRemap, event.keyCode)
+            KEYCODE_Q25_SYM -> q25TargetKeyCode(
+                if (isQ25CurrencyHoldEvent(event.keyCode, event, currencyRemap)) currencyRemap else symRemap,
+                event.keyCode
+            )
+            KeyEvent.KEYCODE_GRAVE -> q25TargetKeyCode(currencyRemap, event.keyCode)
             else -> event.keyCode
         }
         val normalizedScanCode = when (event.keyCode) {
@@ -204,13 +244,56 @@ object DeviceSpecific {
         )
     }
 
-    private fun rebuildNormalizedMetaState(metaState: Int): Int {
+    private fun rebuildNormalizedMetaState(
+        metaState: Int,
+        rightShiftRemap: String,
+        symRemap: String,
+        currencyRemap: String
+    ): Int {
         val mappedShift = if ((metaState and META_Q25_SHIFT) != 0) META_SHIFT else 0
-        val mappedCtrl = if ((metaState and META_Q25_CTRL) != 0) META_CTRL else 0
+        val mappedRightShift = q25TargetMetaState(rightShiftRemap, metaState and META_Q25_CTRL)
         val mappedAlt = if ((metaState and META_Q25_ALT) != 0) META_ALT else 0
-        val mappedSym = if ((metaState and META_Q25_SYM) != 0) META_SYM else 0
-        val mappedMetaState = mappedShift or mappedCtrl or mappedAlt or mappedSym
+        val symSourceMeta = if (q25CurrencyHoldActive) META_Q25_SYM else metaState and META_Q25_SYM
+        val mappedSym = q25TargetMetaState(
+            if (q25CurrencyHoldActive) currencyRemap else symRemap,
+            symSourceMeta
+        )
+        val mappedMetaState = mappedShift or mappedRightShift or mappedAlt or mappedSym
         return (metaState and RELOADABLE_META_MASK.inv()) or mappedMetaState
+    }
+
+    private fun isQ25CurrencyHoldEvent(
+        keyCode: Int,
+        event: KeyEvent?,
+        currencyRemap: String
+    ): Boolean =
+        currencyRemap != "original" &&
+            (
+                keyCode == KeyEvent.KEYCODE_GRAVE ||
+                    (
+                        keyCode == KEYCODE_Q25_SYM &&
+                            event?.scanCode == SCANCODE_Q25_CURRENCY_HOLD
+                    )
+            )
+
+    private fun q25TargetKeyCode(remap: String, originalKeyCode: Int): Int =
+        when (remap) {
+            "shift" -> KeyEvent.KEYCODE_SHIFT_LEFT
+            "alt" -> KeyEvent.KEYCODE_ALT_LEFT
+            "ctrl" -> KEYCODE_CTRL
+            "sym" -> KEYCODE_SYM
+            else -> originalKeyCode
+        }
+
+    private fun q25TargetMetaState(remap: String, sourceMetaState: Int): Int {
+        if (sourceMetaState == 0) return 0
+        return when (remap) {
+            "shift" -> META_SHIFT
+            "alt" -> META_ALT
+            "ctrl" -> META_CTRL
+            "sym" -> META_SYM
+            else -> sourceMetaState
+        }
     }
 
     private data class BuildFingerprint(
@@ -428,6 +511,10 @@ object DeviceSpecific {
 
     fun isMinimalPhoneDevice(physicalProfileOverride: String? = null): Boolean {
         return resolveKeyboardModel(physicalProfileOverride) == KeyboardModel.MINIMAL_PHONE
+    }
+
+    fun isQ25Device(physicalProfileOverride: String? = null): Boolean {
+        return resolveKeyboardModel(physicalProfileOverride) == KeyboardModel.Q25
     }
 
     fun isPhysicalKeyboardDevice(physicalProfileOverride: String? = null): Boolean {

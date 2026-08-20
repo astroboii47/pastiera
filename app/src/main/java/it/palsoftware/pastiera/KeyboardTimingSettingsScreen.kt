@@ -2,6 +2,7 @@ package it.palsoftware.pastiera
 
 import android.content.Context
 import android.content.Intent
+import android.provider.Settings
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.SizeTransform
@@ -57,6 +58,18 @@ fun KeyboardTimingSettingsScreen(
         mutableStateOf(SettingsManager.getLongPressModifier(context))
     }
 
+    var physicalAltShiftLongPressThreshold by remember {
+        mutableStateOf(SettingsManager.getPhysicalAltShiftLongPressThreshold(context))
+    }
+
+    var secondLongPressThreshold by remember {
+        mutableStateOf(SettingsManager.getSecondLongPressThreshold(context))
+    }
+
+    var secondLongPressModifier by remember {
+        mutableStateOf(SettingsManager.getSecondLongPressModifier(context))
+    }
+
     var shiftTapLatches by remember {
         mutableStateOf(SettingsManager.getShiftTapLatches(context))
     }
@@ -71,6 +84,18 @@ fun KeyboardTimingSettingsScreen(
     }
     var ctrlLatchStaysOnSpace by remember {
         mutableStateOf(SettingsManager.getCtrlLatchStaysOnSpace(context))
+    }
+    var q25RightShiftRemap by remember {
+        mutableStateOf(SettingsManager.getQ25RightShiftRemap(context))
+    }
+    var q25SymRemap by remember {
+        mutableStateOf(SettingsManager.getQ25SymRemap(context))
+    }
+    var q25CurrencyRemap by remember {
+        mutableStateOf(SettingsManager.getQ25CurrencyRemap(context))
+    }
+    var q25MessengerFocusFixEnabled by remember {
+        mutableStateOf(SettingsManager.getQ25MessengerFocusFixEnabled(context))
     }
 
     var showVirtualKeyboardSettings by remember { mutableStateOf(false) }
@@ -104,6 +129,12 @@ fun KeyboardTimingSettingsScreen(
                 onLongPressThresholdChange = { longPressThreshold = it },
                 longPressModifier = longPressModifier,
                 onLongPressModifierChange = { longPressModifier = it },
+                physicalAltShiftLongPressThreshold = physicalAltShiftLongPressThreshold,
+                onPhysicalAltShiftLongPressThresholdChange = { physicalAltShiftLongPressThreshold = it },
+                secondLongPressThreshold = secondLongPressThreshold,
+                onSecondLongPressThresholdChange = { secondLongPressThreshold = it },
+                secondLongPressModifier = secondLongPressModifier,
+                onSecondLongPressModifierChange = { secondLongPressModifier = it },
                 shiftTapLatches = shiftTapLatches,
                 onShiftTapLatchesChange = { shiftTapLatches = it },
                 altTapLatches = altTapLatches,
@@ -114,6 +145,14 @@ fun KeyboardTimingSettingsScreen(
                 onAltLatchStaysOnSpaceChange = { altLatchStaysOnSpace = it },
                 ctrlLatchStaysOnSpace = ctrlLatchStaysOnSpace,
                 onCtrlLatchStaysOnSpaceChange = { ctrlLatchStaysOnSpace = it },
+                q25RightShiftRemap = q25RightShiftRemap,
+                onQ25RightShiftRemapChange = { q25RightShiftRemap = it },
+                q25SymRemap = q25SymRemap,
+                onQ25SymRemapChange = { q25SymRemap = it },
+                q25CurrencyRemap = q25CurrencyRemap,
+                onQ25CurrencyRemapChange = { q25CurrencyRemap = it },
+                q25MessengerFocusFixEnabled = q25MessengerFocusFixEnabled,
+                onQ25MessengerFocusFixEnabledChange = { q25MessengerFocusFixEnabled = it },
                 onVirtualKeyboardSettingsClick = { showVirtualKeyboardSettings = true }
             )
         }
@@ -128,6 +167,12 @@ private fun KeyboardTimingMainContent(
     onLongPressThresholdChange: (Long) -> Unit,
     longPressModifier: String,
     onLongPressModifierChange: (String) -> Unit,
+    physicalAltShiftLongPressThreshold: Long,
+    onPhysicalAltShiftLongPressThresholdChange: (Long) -> Unit,
+    secondLongPressThreshold: Long,
+    onSecondLongPressThresholdChange: (Long) -> Unit,
+    secondLongPressModifier: String,
+    onSecondLongPressModifierChange: (String) -> Unit,
     shiftTapLatches: Boolean,
     onShiftTapLatchesChange: (Boolean) -> Unit,
     altTapLatches: Boolean,
@@ -138,6 +183,14 @@ private fun KeyboardTimingMainContent(
     onAltLatchStaysOnSpaceChange: (Boolean) -> Unit,
     ctrlLatchStaysOnSpace: Boolean,
     onCtrlLatchStaysOnSpaceChange: (Boolean) -> Unit,
+    q25RightShiftRemap: String,
+    onQ25RightShiftRemapChange: (String) -> Unit,
+    q25SymRemap: String,
+    onQ25SymRemapChange: (String) -> Unit,
+    q25CurrencyRemap: String,
+    onQ25CurrencyRemapChange: (String) -> Unit,
+    q25MessengerFocusFixEnabled: Boolean,
+    onQ25MessengerFocusFixEnabledChange: (Boolean) -> Unit,
     onVirtualKeyboardSettingsClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -348,6 +401,195 @@ private fun KeyboardTimingMainContent(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(64.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Timer,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.physical_alt_shift_long_press_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.keyboard_timing_long_press_value,
+                                physicalAltShiftLongPressThreshold
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                    Slider(
+                        value = physicalAltShiftLongPressThreshold.toFloat(),
+                        onValueChange = { newValue ->
+                            val clampedValue = newValue.toLong().coerceIn(
+                                SettingsManager.getMinLongPressThreshold(),
+                                SettingsManager.getMaxLongPressThreshold()
+                            )
+                            onPhysicalAltShiftLongPressThresholdChange(clampedValue)
+                            SettingsManager.setPhysicalAltShiftLongPressThreshold(context, clampedValue)
+                        },
+                        valueRange = SettingsManager.getMinLongPressThreshold().toFloat()..SettingsManager.getMaxLongPressThreshold().toFloat(),
+                        steps = 18,
+                        modifier = Modifier
+                            .weight(1.5f)
+                            .height(24.dp)
+                    )
+                }
+            }
+
+            val minSecondLongPressThreshold = (longPressThreshold + 50L)
+                .coerceAtMost(SettingsManager.getMaxSecondLongPressThreshold())
+            val effectiveSecondLongPressThreshold = secondLongPressThreshold
+                .coerceIn(minSecondLongPressThreshold, SettingsManager.getMaxSecondLongPressThreshold())
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Timer,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.second_long_press_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.keyboard_timing_long_press_value,
+                                effectiveSecondLongPressThreshold
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                    Slider(
+                        value = effectiveSecondLongPressThreshold.toFloat(),
+                        onValueChange = { newValue ->
+                            val clampedValue = newValue.toLong().coerceIn(
+                                minSecondLongPressThreshold,
+                                SettingsManager.getMaxSecondLongPressThreshold()
+                            )
+                            onSecondLongPressThresholdChange(clampedValue)
+                            SettingsManager.setSecondLongPressThreshold(context, clampedValue)
+                        },
+                        valueRange = minSecondLongPressThreshold.toFloat()..SettingsManager.getMaxSecondLongPressThreshold().toFloat(),
+                        steps = 18,
+                        modifier = Modifier
+                            .weight(1.5f)
+                            .height(24.dp)
+                    )
+                }
+            }
+
+            var showSecondModifierMenu by remember { mutableStateOf(false) }
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .clickable { showSecondModifierMenu = true }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Keyboard,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.second_long_press_modifier_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = when (secondLongPressModifier) {
+                                "alt" -> stringResource(R.string.long_press_modifier_alt)
+                                "shift" -> stringResource(R.string.long_press_modifier_shift)
+                                "variations" -> stringResource(R.string.long_press_modifier_variations)
+                                "sym" -> stringResource(R.string.long_press_modifier_sym)
+                                else -> stringResource(R.string.second_long_press_modifier_off)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showSecondModifierMenu,
+                    onDismissRequest = { showSecondModifierMenu = false }
+                ) {
+                    listOf(
+                        "off" to R.string.second_long_press_modifier_off,
+                        "alt" to R.string.long_press_modifier_alt,
+                        "shift" to R.string.long_press_modifier_shift,
+                        "variations" to R.string.long_press_modifier_variations,
+                        "sym" to R.string.long_press_modifier_sym
+                    ).forEach { (value, labelRes) ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(labelRes)) },
+                            onClick = {
+                                onSecondLongPressModifierChange(value)
+                                SettingsManager.setSecondLongPressModifier(context, value)
+                                showSecondModifierMenu = false
+                            },
+                            leadingIcon = {
+                                if (secondLongPressModifier == value) {
+                                    Icon(Icons.Default.Check, contentDescription = null)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
                     .height(74.dp)
                     .clickable { onVirtualKeyboardSettingsClick() }
             ) {
@@ -448,9 +690,141 @@ private fun KeyboardTimingMainContent(
                     }
                 )
             }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            Text(
+                text = stringResource(R.string.q25_key_remaps_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
+
+            Q25RemapRow(
+                title = stringResource(R.string.q25_right_shift_remap_title),
+                value = q25RightShiftRemap,
+                onValueChange = { value ->
+                    onQ25RightShiftRemapChange(value)
+                    SettingsManager.setQ25RightShiftRemap(context, value)
+                }
+            )
+
+            Q25RemapRow(
+                title = stringResource(R.string.q25_sym_remap_title),
+                value = q25SymRemap,
+                onValueChange = { value ->
+                    onQ25SymRemapChange(value)
+                    SettingsManager.setQ25SymRemap(context, value)
+                }
+            )
+
+            Q25RemapRow(
+                title = stringResource(R.string.q25_currency_remap_title),
+                value = q25CurrencyRemap,
+                onValueChange = { value ->
+                    onQ25CurrencyRemapChange(value)
+                    SettingsManager.setQ25CurrencyRemap(context, value)
+                }
+            )
+
+            ModifierTapLatchRow(
+                title = stringResource(R.string.q25_messenger_focus_fix_title),
+                description = stringResource(R.string.q25_messenger_focus_fix_description),
+                checked = q25MessengerFocusFixEnabled,
+                onCheckedChange = { enabled ->
+                    onQ25MessengerFocusFixEnabledChange(enabled)
+                    SettingsManager.setQ25MessengerFocusFixEnabled(context, enabled)
+                    if (enabled) {
+                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        })
+                    }
+                }
+            )
         }
     }
 }
+
+@Composable
+private fun Q25RemapRow(
+    title: String,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .clickable { showMenu = true }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Keyboard,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
+                )
+                Text(
+                    text = q25RemapLabel(value),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.ArrowDropDown,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false }
+        ) {
+            SettingsManager.q25ModifierRemapOptions().forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(q25RemapLabel(option)) },
+                    onClick = {
+                        onValueChange(option)
+                        showMenu = false
+                    },
+                    leadingIcon = {
+                        if (value == option) {
+                            Icon(Icons.Default.Check, contentDescription = null)
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun q25RemapLabel(value: String): String =
+    when (value) {
+        SettingsManager.Q25_REMAP_SHIFT -> stringResource(R.string.q25_remap_shift)
+        SettingsManager.Q25_REMAP_ALT -> stringResource(R.string.q25_remap_alt)
+        SettingsManager.Q25_REMAP_CTRL -> stringResource(R.string.q25_remap_ctrl)
+        SettingsManager.Q25_REMAP_SYM -> stringResource(R.string.q25_remap_sym)
+        else -> stringResource(R.string.q25_remap_original)
+    }
 
 @Composable
 private fun VirtualKeyboardBehaviorSettingsScreen(

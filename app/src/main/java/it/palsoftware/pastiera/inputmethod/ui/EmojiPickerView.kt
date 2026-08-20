@@ -41,6 +41,7 @@ import it.palsoftware.pastiera.data.emoji.EmojiSearchRepository
 import it.palsoftware.pastiera.emoji.CustomEmojiFontManager
 import it.palsoftware.pastiera.gif.KlipyGifClient
 import it.palsoftware.pastiera.gif.KlipyGifResult
+import it.palsoftware.pastiera.inputmethod.ui.InlineMediaSearchType
 import android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -379,6 +380,12 @@ class EmojiPickerView(
     fun showMediaTab() {
         if (onGifSelected == null) return
         setMediaMode(true)
+    }
+
+    fun showMediaSearch(type: InlineMediaSearchType, query: String) {
+        if (onGifSelected == null) return
+        setMediaMode(true)
+        gifPickerView?.showInlineSearch(type, query)
     }
 
     fun isMediaTabActive(): Boolean = isMediaMode
