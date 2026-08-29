@@ -42,6 +42,7 @@ class InputEventRouter(
 
     var suggestionController: it.palsoftware.pastiera.core.suggestions.SuggestionController? = null
     var onCommitText: ((CharSequence) -> Unit)? = null
+    var onTextCommittedAfterInputConnection: ((CharSequence) -> Unit)? = null
 
     private fun isSuggestionDebugLoggingEnabled(): Boolean =
         SettingsManager.isSuggestionDebugLoggingEnabled(context)
@@ -83,6 +84,7 @@ class InputEventRouter(
         }
         onCommitText?.invoke(text)
         ic?.commitText(text, 1)
+        onTextCommittedAfterInputConnection?.invoke(text)
         if (trackWord) {
             if (isSuggestionDebugLoggingEnabled()) {
                 Log.d("PastieraIME", "commitTextWithTracking notify SC: '$text'")
@@ -497,7 +499,14 @@ class InputEventRouter(
             }
         }
 
-        if (event?.isCtrlPressed == true || params.ctrlLatchActive || params.ctrlOneShot || (params.isNumericField && effectiveCtrlActive)) {
+        if (
+            event?.isCtrlPressed == true ||
+            params.ctrlPressed ||
+            params.ctrlPhysicallyPressed ||
+            params.ctrlLatchActive ||
+            params.ctrlOneShot ||
+            (params.isNumericField && effectiveCtrlActive)
+        ) {
             if (
                 handleCtrlModifiedKey(
                     keyCode = keyCode,
@@ -852,7 +861,8 @@ class InputEventRouter(
         inputContextState: it.palsoftware.pastiera.core.InputContextState?,
         enableShiftOneShot: (() -> Boolean)?,
         editorInfo: EditorInfo? = null,
-        updateStatusBar: () -> Unit
+        updateStatusBar: () -> Unit,
+        scheduleAutoCapitalizeAtCursor: (() -> Unit)? = null
     ): Boolean {
         val isEnterKey = keyCode == KeyEvent.KEYCODE_ENTER
         val isSpaceKey = keyCode == KeyEvent.KEYCODE_SPACE
@@ -981,6 +991,10 @@ class InputEventRouter(
             shouldDisableAutoCapitalize,
             onStatusBarUpdate = updateStatusBar
         )
+
+        if (isBoundaryKey && !shouldDisableAutoCapitalize) {
+            scheduleAutoCapitalizeAtCursor?.invoke()
+        }
 
         // Handle field-specific capitalization flags (CAP_WORDS, CAP_SENTENCES) after boundary keys
         if (inputContextState != null && enableShiftOneShot != null) {

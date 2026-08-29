@@ -6,6 +6,7 @@ import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.text.Editable
 import android.text.InputType
@@ -41,6 +42,7 @@ import it.palsoftware.pastiera.data.emoji.EmojiSearchRepository
 import it.palsoftware.pastiera.emoji.CustomEmojiFontManager
 import it.palsoftware.pastiera.gif.KlipyGifClient
 import it.palsoftware.pastiera.gif.KlipyGifResult
+import it.palsoftware.pastiera.gif.KlipyMediaType
 import it.palsoftware.pastiera.inputmethod.ui.InlineMediaSearchType
 import android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
 import kotlinx.coroutines.CancellationException
@@ -79,7 +81,8 @@ class EmojiPickerView(
     private var coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var loadingJob: Job? = null
 
-    private val compactHeight = dpToPx(177f)
+    private val compactHeight = dpToPx(220f)
+    private val expandedHeight = dpToPx(340f)
     private val emojiSize = dpToPx(48f)
     private val spacing = dpToPx(4f)
     private val smallPadding = dpToPx(8f)
@@ -110,9 +113,12 @@ class EmojiPickerView(
     private var pendingSearchReplacementRange: IntRange? = null
     private var tabCategoryIds: List<String> = emptyList()
     private var gifTabView: TextView? = null
+    private var wechatTabView: ImageView? = null
+    private var wechatEmojiItems: List<WechatEmojiItem> = emptyList()
     private var gifPickerView: GifPickerView? = null
     private var customEmojiTypeface = CustomEmojiFontManager.getTypeface(context)
     private var isMediaMode: Boolean = false
+    private var lastSoftwareKeyboardHeightPx: Int? = null
     var themeOverride: KeyboardThemeColors? = null
         set(value) {
             if (field == value) {
@@ -384,7 +390,7 @@ class EmojiPickerView(
 
     fun showMediaSearch(type: InlineMediaSearchType, query: String) {
         if (onGifSelected == null) return
-        setMediaMode(true)
+        setMediaMode(true, refreshOnOpen = false)
         gifPickerView?.showInlineSearch(type, query)
     }
 
@@ -407,8 +413,9 @@ class EmojiPickerView(
     }
 
     fun configureSoftwareKeyboardMode(heightPx: Int?, onKeyboardLayoutRequested: (() -> Unit)?) {
+        lastSoftwareKeyboardHeightPx = heightPx
         val configuredHeight = if (it.palsoftware.pastiera.SettingsManager.getEmojiPickerExpandedHeight(context)) {
-            (compactHeight * 1.5f).toInt()
+            expandedHeight
         } else {
             compactHeight
         }
@@ -704,8 +711,10 @@ class EmojiPickerView(
                 val recentCategory = withContext(Dispatchers.IO) { RecentEmojiManager.getRecentEmojiCategory(context) }
                 val regularCategories = withContext(Dispatchers.IO) { EmojiRepository.getEmojiCategories(context) }
                 val loadedSearchIndex = withContext(Dispatchers.IO) { EmojiSearchRepository.getSearchIndex(context) }
+                val loadedWechatEmoji = withContext(Dispatchers.IO) { loadWechatEmojiItems() }
                 this@EmojiPickerView.regularCategories = regularCategories
                 this@EmojiPickerView.searchIndex = loadedSearchIndex
+                this@EmojiPickerView.wechatEmojiItems = loadedWechatEmoji
 
                 val allCategories = mutableListOf<EmojiRepository.EmojiCategory>()
                 if (recentCategory != null) allCategories.add(recentCategory)
@@ -817,7 +826,7 @@ class EmojiPickerView(
         }
     }
 
-    private fun setMediaMode(enabled: Boolean) {
+    private fun setMediaMode(enabled: Boolean, refreshOnOpen: Boolean = true) {
         if (isMediaMode == enabled) {
             updateTabsSelection()
             return
@@ -849,7 +858,9 @@ class EmojiPickerView(
             }
             mediaView.visibility = View.VISIBLE
             mediaView.bringToFront()
-            mediaView.refresh()
+            if (refreshOnOpen) {
+                mediaView.refresh()
+            }
         } else {
             gifPickerView?.visibility = View.GONE
             searchPanel.visibility = if (isSearchPanelVisible) View.VISIBLE else View.GONE
@@ -942,6 +953,14 @@ class EmojiPickerView(
                 categoryIds.add(category.id)
             }
         }
+        if (wechatEmojiItems.isNotEmpty()) {
+            items.add(SectionItem.Header(WECHAT_EMOJI_CATEGORY_ID, "WeChat"))
+            categoryIds.add(WECHAT_EMOJI_CATEGORY_ID)
+            wechatEmojiItems.forEach { item ->
+                items.add(SectionItem.WechatEmoji(item))
+                categoryIds.add(WECHAT_EMOJI_CATEGORY_ID)
+            }
+        }
 
         rebuildIndexCaches(items, categoryIds)
         sectionAdapter.submitList(items)
@@ -995,6 +1014,34 @@ class EmojiPickerView(
             }
             tabRow.addView(btn)
         }
+        if (wechatEmojiItems.isNotEmpty()) {
+            val isSelected = selectedCategoryId == WECHAT_EMOJI_CATEGORY_ID
+            val btn = ImageView(context).apply {
+                setImageResource(R.drawable.ic_wechat_emoji_24)
+                contentDescription = "WeChat emoji"
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                setColorFilter(themeOverride?.textAndIcons ?: Color.WHITE)
+                background = createTabBackground(isSelected)
+                val pad = dpToPx(4f)
+                setPadding(pad, pad, pad, pad)
+                isClickable = true
+                isFocusable = true
+                layoutParams = LinearLayout.LayoutParams(0, tabHeight, 1f)
+                setOnClickListener {
+                    if (isSearchMode) return@setOnClickListener
+                    setMediaMode(false)
+                    selectedCategoryId = WECHAT_EMOJI_CATEGORY_ID
+                    updateTabsSelection()
+                    isTabClickScroll = true
+                    val headerPos = headerPositions[WECHAT_EMOJI_CATEGORY_ID] ?: return@setOnClickListener
+                    (recyclerView.layoutManager as? GridLayoutManager)?.scrollToPositionWithOffset(headerPos, 0)
+                }
+            }
+            wechatTabView = btn
+            tabRow.addView(btn)
+        } else {
+            wechatTabView = null
+        }
         // The Media tab belongs to the emoji picker; gifPickerEnabled only controls
         // whether media appears as a separate SYM page in the SYM cycle.
         if (onGifSelected != null) {
@@ -1034,6 +1081,8 @@ class EmojiPickerView(
                 view.setTextColor(themeOverride?.textAndIcons ?: Color.WHITE)
             }
         }
+        wechatTabView?.background = createTabBackground(!isMediaMode && selectedCategoryId == WECHAT_EMOJI_CATEGORY_ID)
+        wechatTabView?.setColorFilter(themeOverride?.textAndIcons ?: Color.WHITE)
         gifTabView?.background = createTabBackground(isMediaMode)
     }
 
@@ -1063,6 +1112,28 @@ class EmojiPickerView(
                     requestRecentsRefresh(requireTop = !requiresNotRecents, requireNotRecents = requiresNotRecents)
                 }
             }
+        }
+    }
+
+    private fun onWechatEmojiSelected(item: WechatEmojiItem) {
+        val result = KlipyGifResult(
+            id = "wechat_${item.fileName}",
+            title = item.title,
+            mediaType = KlipyMediaType.LOCAL,
+            previewUrl = item.assetUrl,
+            gifUrl = item.assetUrl,
+            mimeType = "image/png",
+            shareUrl = "",
+            isLocal = true
+        )
+        if (
+            SettingsManager.getSymAutoClose(context) &&
+            SettingsManager.getSymAutoCloseOnTouch(context)
+        ) {
+            onCloseRequested?.invoke()
+            post { onGifSelected?.invoke(result) }
+        } else {
+            onGifSelected?.invoke(result)
         }
     }
 
@@ -1363,6 +1434,7 @@ class EmojiPickerView(
             return when (getItem(position)) {
                 is SectionItem.Header -> VIEW_TYPE_HEADER
                 is SectionItem.Emoji -> VIEW_TYPE_EMOJI
+                is SectionItem.WechatEmoji -> VIEW_TYPE_WECHAT_EMOJI
             }
         }
 
@@ -1376,6 +1448,17 @@ class EmojiPickerView(
                     )
                 }
                 HeaderViewHolder(spacer)
+            } else if (viewType == VIEW_TYPE_WECHAT_EMOJI) {
+                val image = ImageView(parent.context).apply {
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    adjustViewBounds = false
+                    setPadding(dpToPx(6f), dpToPx(6f), dpToPx(6f), dpToPx(6f))
+                    layoutParams = RecyclerView.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        emojiSize
+                    )
+                }
+                WechatEmojiViewHolder(image)
             } else {
                 val tv = TextView(parent.context).apply {
                     gravity = Gravity.CENTER
@@ -1415,12 +1498,22 @@ class EmojiPickerView(
                         true
                     }
                 }
+                is SectionItem.WechatEmoji -> {
+                    val imageView = (holder as WechatEmojiViewHolder).imageView
+                    imageView.contentDescription = item.item.title
+                    imageView.setImageDrawable(loadAssetDrawable(item.item.assetPath))
+                    imageView.setOnClickListener {
+                        onWechatEmojiSelected(item.item)
+                    }
+                    imageView.setOnLongClickListener(null)
+                }
             }
         }
     }
 
     private class HeaderViewHolder(view: View) : RecyclerView.ViewHolder(view)
     private class EmojiViewHolder(val textView: TextView) : RecyclerView.ViewHolder(textView)
+    private class WechatEmojiViewHolder(val imageView: ImageView) : RecyclerView.ViewHolder(imageView)
     private class SearchEmojiViewHolder(val textView: TextView) : RecyclerView.ViewHolder(textView)
 
     private inner class SearchAdapter :
@@ -1470,6 +1563,15 @@ class EmojiPickerView(
     private sealed class SectionItem {
         data class Header(val categoryId: String, val title: String) : SectionItem()
         data class Emoji(val categoryId: String, val entry: EmojiRepository.EmojiEntry) : SectionItem()
+        data class WechatEmoji(val item: WechatEmojiItem) : SectionItem()
+    }
+
+    private data class WechatEmojiItem(
+        val fileName: String,
+        val title: String,
+        val assetPath: String
+    ) {
+        val assetUrl: String = "asset://$assetPath"
     }
 
     private class SectionItemDiffCallback : DiffUtil.ItemCallback<SectionItem>() {
@@ -1479,6 +1581,8 @@ class EmojiPickerView(
                     oldItem.categoryId == newItem.categoryId
                 oldItem is SectionItem.Emoji && newItem is SectionItem.Emoji ->
                     oldItem.categoryId == newItem.categoryId && oldItem.entry.base == newItem.entry.base
+                oldItem is SectionItem.WechatEmoji && newItem is SectionItem.WechatEmoji ->
+                    oldItem.item.fileName == newItem.item.fileName
                 else -> false
             }
         }
@@ -1605,11 +1709,42 @@ class EmojiPickerView(
         return when (this) {
             is SectionItem.Header -> categoryId
             is SectionItem.Emoji -> categoryId
+            is SectionItem.WechatEmoji -> WECHAT_EMOJI_CATEGORY_ID
         }
     }
 
+    private fun loadWechatEmojiItems(): List<WechatEmojiItem> {
+        return runCatching {
+            context.assets.list(WECHAT_EMOJI_ASSET_DIR)
+                ?.filter { it.endsWith(".png", ignoreCase = true) }
+                ?.sorted()
+                ?.map { fileName ->
+                    val title = fileName.removeSuffix(".png")
+                        .replace('_', ' ')
+                        .replace('-', ' ')
+                    WechatEmojiItem(
+                        fileName = fileName,
+                        title = title,
+                        assetPath = "$WECHAT_EMOJI_ASSET_DIR/$fileName"
+                    )
+                }
+                .orEmpty()
+        }.getOrDefault(emptyList())
+    }
+
+    private fun loadAssetDrawable(assetPath: String): Drawable? {
+        return runCatching {
+            context.assets.open(assetPath).use { input ->
+                Drawable.createFromStream(input, assetPath)
+            }
+        }.getOrNull()
+    }
+
     companion object {
+        private const val WECHAT_EMOJI_CATEGORY_ID = "wechat_emoji"
+        private const val WECHAT_EMOJI_ASSET_DIR = "common/wechat_emoji"
         private const val VIEW_TYPE_HEADER = 0
         private const val VIEW_TYPE_EMOJI = 1
+        private const val VIEW_TYPE_WECHAT_EMOJI = 2
     }
 }

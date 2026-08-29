@@ -8,11 +8,21 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 class KlipyGifClient(
     private val context: Context,
     private val okHttpClient: OkHttpClient = OkHttpClient()
 ) {
+    private data class CacheEntry(
+        val createdAtMs: Long,
+        val results: List<KlipyGifResult>
+    )
+
+    companion object {
+        private const val CACHE_TTL_MS = 5 * 60 * 1000L
+        private val resultCache = ConcurrentHashMap<String, CacheEntry>()
+    }
 
     fun hasConfiguredApiKey(): Boolean = resolveApiKey().isNotBlank()
 
@@ -26,6 +36,8 @@ class KlipyGifClient(
         if (apiKey.isBlank() || query.isBlank()) return emptyList()
 
         val locale = Locale.getDefault().toLanguageTag().ifBlank { "en" }
+        val cacheKey = "search:${apiKey.takeLast(8)}:${mediaType.name}:$locale:${limit.coerceIn(1, 48)}:${page.coerceAtLeast(1)}:${query.trim().lowercase(Locale.ROOT)}"
+        getCached(cacheKey)?.let { return it }
         val urls = listOf(
             buildSearchUrl(apiKey, query, mediaType, limit, page, locale, useQParam = true),
             buildSearchUrl(apiKey, query, mediaType, limit, page, locale, useQParam = false)
@@ -34,7 +46,7 @@ class KlipyGifClient(
         var lastFailure: Exception? = null
         for (url in urls.distinct()) {
             try {
-                return executeSearch(url, mediaType)
+                return executeSearch(url, mediaType).also { putCached(cacheKey, it) }
             } catch (e: Exception) {
                 lastFailure = e
             }
@@ -51,6 +63,8 @@ class KlipyGifClient(
         if (apiKey.isBlank()) return emptyList()
 
         val locale = Locale.getDefault().toLanguageTag().ifBlank { "en" }
+        val cacheKey = "trending:${apiKey.takeLast(8)}:${mediaType.name}:$locale:${limit.coerceIn(1, 48)}:${page.coerceAtLeast(1)}"
+        getCached(cacheKey)?.let { return it }
         val url = HttpUrl.Builder()
             .scheme("https")
             .host("api.klipy.com")
@@ -64,7 +78,23 @@ class KlipyGifClient(
             .addQueryParameter("rating", "pg-13")
             .addQueryParameter("locale", locale)
             .build()
-        return executeSearch(url, mediaType)
+        return executeSearch(url, mediaType).also { putCached(cacheKey, it) }
+    }
+
+    private fun getCached(key: String): List<KlipyGifResult>? {
+        val entry = resultCache[key] ?: return null
+        if (System.currentTimeMillis() - entry.createdAtMs > CACHE_TTL_MS) {
+            resultCache.remove(key)
+            return null
+        }
+        return entry.results
+    }
+
+    private fun putCached(key: String, results: List<KlipyGifResult>) {
+        if (resultCache.size > 80) {
+            resultCache.clear()
+        }
+        resultCache[key] = CacheEntry(System.currentTimeMillis(), results)
     }
 
     private fun resolveApiKey(): String {

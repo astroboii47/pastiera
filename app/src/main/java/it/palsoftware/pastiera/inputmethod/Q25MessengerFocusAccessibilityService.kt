@@ -6,6 +6,7 @@ import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import it.palsoftware.pastiera.SettingsManager
@@ -48,10 +49,19 @@ class Q25MessengerFocusAccessibilityService : AccessibilityService() {
         pendingRefocus = null
     }
 
+    override fun onKeyEvent(event: KeyEvent?): Boolean {
+        if (event != null && SettingsManager.getSymAsCtrlInTextFields(this) && isTitanSymKey(event)) {
+            symAsCtrlPhysicalHoldActive = event.action == KeyEvent.ACTION_DOWN
+            PhysicalKeyboardInputMethodService.setAccessibilitySymAsCtrlHoldState(symAsCtrlPhysicalHoldActive)
+        }
+        return false
+    }
+
     override fun onDestroy() {
         if (activeService === this) {
             activeService = null
         }
+        symAsCtrlPhysicalHoldActive = false
         super.onDestroy()
     }
 
@@ -130,9 +140,20 @@ class Q25MessengerFocusAccessibilityService : AccessibilityService() {
         private const val REFOCUS_RETRY_DELAY_MS = 140L
         private const val REFOCUS_COOLDOWN_MS = 450L
         private const val ARMED_WINDOW_MS = 1_200L
+        private const val SCANCODE_TITAN2_SYM = 253
 
         @Volatile
         private var activeService: Q25MessengerFocusAccessibilityService? = null
+
+        @Volatile
+        private var symAsCtrlPhysicalHoldActive: Boolean = false
+
+        private fun isTitanSymKey(event: KeyEvent): Boolean {
+            return event.scanCode == SCANCODE_TITAN2_SYM ||
+                event.keyCode == KeyEvent.KEYCODE_SYM
+        }
+
+        fun isSymAsCtrlPhysicalHoldActive(): Boolean = symAsCtrlPhysicalHoldActive
 
         fun requestMessengerRefocus(context: Context, packageName: String?) {
             if (packageName != MESSENGER_PACKAGE) return

@@ -1139,6 +1139,7 @@ class StatusBarController(
             onKeyboardLayoutRequested = if (softwareKeyboardHeight != null) onEmojiPickerRequested else null
         )
         view.setInputConnection(inputConnection)
+        var handledInlineMediaSearch = false
         if (openMediaTabOnNextEmojiPickerRender) {
             view.showMediaTab()
             openMediaTabOnNextEmojiPickerRender = false
@@ -1146,11 +1147,14 @@ class StatusBarController(
         pendingInlineMediaSearch?.let { (type, query) ->
             view.showMediaSearch(type, query)
             pendingInlineMediaSearch = null
+            handledInlineMediaSearch = true
         }
 
         // Only scroll to top when view is just added (first open or switching pages)
         // Don't scroll if view is already in container (user is browsing)
-        if (lastSymPageRendered != 4) {
+        if (handledInlineMediaSearch) {
+            // The inline media query already triggered the needed load.
+        } else if (lastSymPageRendered != 4) {
             view.refresh() // First time or switching from another page
         } else if (wasJustAdded) {
             view.scrollToTop() // View was just added (happens when reopening after being removed)

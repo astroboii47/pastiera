@@ -121,11 +121,36 @@ class GifContentSender(
     }
 
     private fun writeMediaToFile(result: KlipyGifResult, outputFile: File, preparedMimeType: String) {
+        if (result.gifUrl.startsWith("asset://")) {
+            copyAssetToFile(result.gifUrl.removePrefix("asset://"), outputFile)
+            return
+        }
+        if (result.isLocal && result.mimeType.equals(PNG_MIME_TYPE, ignoreCase = true)) {
+            copyContentUriToFile(result.gifUrl, outputFile)
+            return
+        }
         if (result.isLocal && preparedMimeType == PNG_MIME_TYPE) {
             transcodeLocalImageToPng(result.gifUrl, outputFile)
             return
         }
         downloadToFile(result.gifUrl, outputFile)
+    }
+
+    private fun copyAssetToFile(assetPath: String, outputFile: File) {
+        context.assets.open(assetPath).use { input ->
+            outputFile.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+    }
+
+    private fun copyContentUriToFile(url: String, outputFile: File) {
+        val uri = Uri.parse(url)
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            outputFile.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        } ?: throw IllegalStateException("Unable to open local media uri")
     }
 
     private fun transcodeLocalImageToPng(url: String, outputFile: File) {

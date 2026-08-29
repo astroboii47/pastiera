@@ -1172,6 +1172,8 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="local_media_no_folder">No local folder selected.</string>
     <string name="local_media_folder_selected">Folder selected: %1$s</string>
     <string name="local_media_choose_folder_prompt">Choose a local folder to show your own images here.</string>
+    <string name="sticker_packs_import_folder">Import folder</string>
+    <string name="sticker_packs_empty_prompt">Import a sticker pack folder to show stickers here.</string>
     <string name="emoji_shortcodes_title">Emoji shortcodes</string>
     <string name="emoji_shortcodes_description">Type :smile: to insert the matching emoji while typing.</string>
     <string name="symbol_shortcodes_title">Symbol shortcodes</string>
@@ -1221,10 +1223,12 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="q25_right_shift_remap_title">Right Shift key</string>
     <string name="q25_sym_remap_title">SYM key</string>
     <string name="q25_currency_remap_title">$ key</string>
-    <string name="q25_messenger_focus_fix_title">Messenger focus fix</string>
-    <string name="q25_messenger_focus_fix_description">For Q25: re-focus Messenger’s message box after the full Pastiera bar appears. Requires enabling the Pastiera accessibility service.</string>
-    <string name="q25_messenger_focus_fix_service_label">Pastiera Q25 Messenger Focus Fix</string>
-    <string name="q25_messenger_focus_fix_service_description">Re-focuses Messenger’s message field on Q25 when the Pastiera bar causes Messenger to move focus.</string>
+    <string name="q25_messenger_focus_fix_title">Messenger focus helper</string>
+    <string name="q25_messenger_focus_fix_description">Re-focus Messenger’s message box after the full Pastiera bar appears. Requires enabling the Pastiera Enhanced accessibility helper.</string>
+    <string name="q25_messenger_focus_fix_service_label">Pastiera Enhanced Helper</string>
+    <string name="q25_messenger_focus_fix_service_description">Supports optional Pastiera Enhanced keyboard helpers such as Messenger focus repair and Titan SYM-as-Ctrl.</string>
+    <string name="sym_as_ctrl_in_text_fields_title">SYM acts as Ctrl in text fields</string>
+    <string name="sym_as_ctrl_in_text_fields_description">When typing, hold the physical SYM key to use Ctrl/nav-mode shortcuts instead of SYM symbols.</string>
     <string name="q25_remap_original">Original</string>
     <string name="q25_remap_shift">Shift</string>
     <string name="q25_remap_alt">Alt</string>

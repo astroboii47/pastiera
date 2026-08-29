@@ -194,8 +194,8 @@ object AutoCapitalizeHelper {
             // CAP_WORDS: capitalize at start of word (ignore user settings)
             if (inputContextState.requiresCapWords) {
                 if (isAtStartOfWord(ic)) {
+                    smartShiftRequested = true
                     if (enableShift()) {
-                        smartShiftRequested = true
                         onUpdateStatusBar()
                     }
                     return
@@ -233,8 +233,8 @@ object AutoCapitalizeHelper {
                         }
                         
                         if (shouldCapitalize) {
+                            smartShiftRequested = true
                             if (enableShift()) {
-                                smartShiftRequested = true
                                 onUpdateStatusBar()
                             }
                             return
@@ -270,8 +270,8 @@ object AutoCapitalizeHelper {
 
         val shouldCapitalize = shouldAutoCap(settings, cursorContext.before, cursorContext.after)
         if (shouldCapitalize) {
+            smartShiftRequested = true
             if (enableShift()) {
-                smartShiftRequested = true
                 onUpdateStatusBar()
             }
         } else {
@@ -453,8 +453,8 @@ object AutoCapitalizeHelper {
         // Handle textCapWords: enable shift one-shot if at start of word
         if (state.requiresCapWords) {
             if (isAtStartOfWord(inputConnection)) {
+                smartShiftRequested = true
                 if (enableShiftOneShot()) {
-                    smartShiftRequested = true
                     onUpdateStatusBar()
                 }
             }
@@ -486,8 +486,8 @@ object AutoCapitalizeHelper {
                         }
                         
                         if (shouldCapitalize) {
+                            smartShiftRequested = true
                             if (enableShiftOneShot()) {
-                                smartShiftRequested = true
                                 onUpdateStatusBar()
                             }
                         }

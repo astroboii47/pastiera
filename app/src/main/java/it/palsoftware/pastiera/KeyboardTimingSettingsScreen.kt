@@ -85,6 +85,9 @@ fun KeyboardTimingSettingsScreen(
     var ctrlLatchStaysOnSpace by remember {
         mutableStateOf(SettingsManager.getCtrlLatchStaysOnSpace(context))
     }
+    var symAsCtrlInTextFields by remember {
+        mutableStateOf(SettingsManager.getSymAsCtrlInTextFields(context))
+    }
     var q25RightShiftRemap by remember {
         mutableStateOf(SettingsManager.getQ25RightShiftRemap(context))
     }
@@ -145,6 +148,8 @@ fun KeyboardTimingSettingsScreen(
                 onAltLatchStaysOnSpaceChange = { altLatchStaysOnSpace = it },
                 ctrlLatchStaysOnSpace = ctrlLatchStaysOnSpace,
                 onCtrlLatchStaysOnSpaceChange = { ctrlLatchStaysOnSpace = it },
+                symAsCtrlInTextFields = symAsCtrlInTextFields,
+                onSymAsCtrlInTextFieldsChange = { symAsCtrlInTextFields = it },
                 q25RightShiftRemap = q25RightShiftRemap,
                 onQ25RightShiftRemapChange = { q25RightShiftRemap = it },
                 q25SymRemap = q25SymRemap,
@@ -183,6 +188,8 @@ private fun KeyboardTimingMainContent(
     onAltLatchStaysOnSpaceChange: (Boolean) -> Unit,
     ctrlLatchStaysOnSpace: Boolean,
     onCtrlLatchStaysOnSpaceChange: (Boolean) -> Unit,
+    symAsCtrlInTextFields: Boolean,
+    onSymAsCtrlInTextFieldsChange: (Boolean) -> Unit,
     q25RightShiftRemap: String,
     onQ25RightShiftRemapChange: (String) -> Unit,
     q25SymRemap: String,
@@ -690,6 +697,16 @@ private fun KeyboardTimingMainContent(
                     }
                 )
             }
+
+            ModifierTapLatchRow(
+                title = stringResource(R.string.sym_as_ctrl_in_text_fields_title),
+                description = stringResource(R.string.sym_as_ctrl_in_text_fields_description),
+                checked = symAsCtrlInTextFields,
+                onCheckedChange = { enabled ->
+                    onSymAsCtrlInTextFieldsChange(enabled)
+                    SettingsManager.setSymAsCtrlInTextFields(context, enabled)
+                }
+            )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 

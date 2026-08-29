@@ -140,6 +140,12 @@
             android:excludeFromRecents="true"
             android:theme="@style/Theme.Pastiera" />
 
+        <activity
+            android:name=".StickerPackImportActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Pastiera" />
+
         <!-- Activity for trackpad debug -->
         <activity
             android:name=".TrackpadDebugActivity"

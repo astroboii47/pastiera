@@ -1,5 +1,21 @@
 # Changelog
 
+## Pastiera Enhanced 4.4
+
+Builds on this branch are posted here first for faster troubleshooting and testing. These changes are intended to be split into pull requests against the main Pastiera branch once they are stable enough for upstream review.
+
+### Added
+- WeChat-style emoji pack tab in the emoji picker.
+- Import support for local sticker packs.
+- Optional Titan SYM-as-Ctrl behaviour in text fields.
+
+### Fixed and Improved
+- Fixed intermittent Titan SYM-as-Ctrl hold state by syncing the physical SYM down/up state through the Pastiera Enhanced accessibility helper.
+- Cleaned up the accessibility helper naming and removed noisy SYM debug logging.
+- Improved auto-capitalisation after typed punctuation and spaces.
+- Improved GIF/sticker media loading, sizing, search behaviour, and fallback sending.
+- Improved shortcode popup dismissal, including Back closing emoji shortcode popups.
+
 ## Pastiera Enhanced 4.1
 
 Builds on this branch are posted here first for faster troubleshooting and testing. These changes are intended to be split into pull requests against the main Pastiera branch once they are stable enough for upstream review.

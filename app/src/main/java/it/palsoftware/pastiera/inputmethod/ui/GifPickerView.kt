@@ -36,11 +36,13 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import it.palsoftware.pastiera.R
 import it.palsoftware.pastiera.LocalMediaPickerActivity
+import it.palsoftware.pastiera.StickerPackImportActivity
 import it.palsoftware.pastiera.gif.GifFavoritesManager
 import it.palsoftware.pastiera.gif.KlipyGifClient
 import it.palsoftware.pastiera.gif.KlipyGifResult
 import it.palsoftware.pastiera.gif.KlipyMediaType
 import it.palsoftware.pastiera.gif.LocalMediaRepository
+import it.palsoftware.pastiera.gif.StickerPackRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,7 +65,8 @@ private enum class MediaPickerTab(
     FAVORITES(null, "Favourites"),
     GIFS(KlipyMediaType.GIF, KlipyMediaType.GIF.displayName),
     STICKERS(KlipyMediaType.STICKER, KlipyMediaType.STICKER.displayName),
-    LOCAL(KlipyMediaType.LOCAL, KlipyMediaType.LOCAL.displayName)
+    LOCAL(KlipyMediaType.LOCAL, KlipyMediaType.LOCAL.displayName),
+    PACKS(null, "Packs")
 }
 
 enum class InlineMediaSearchType {
@@ -91,6 +94,8 @@ class GifPickerView(
     private val mediaTypeTabs: LinearLayout
     private val localFolderBar: LinearLayout
     private val localFolderText: TextView
+    private val packBar: LinearLayout
+    private val packRow: LinearLayout
     private val previewOverlay: FrameLayout
     private val previewImageView: ImageView
     private val previewTitleView: TextView
@@ -116,14 +121,29 @@ class GifPickerView(
     private var currentPage = 0
     private var reachedEnd = false
     private var loadingPage = false
+    private var loadGeneration = 0
     private var currentItems: List<KlipyGifResult> = emptyList()
     private var localFolderReceiverRegistered = false
+    private var stickerPackReceiverRegistered = false
+    private var stickerPacks: List<StickerPackRepository.StickerPack> = emptyList()
+    private var selectedStickerPackUri: String? = null
     private val localMediaRepository = LocalMediaRepository(context)
+    private val stickerPackRepository = StickerPackRepository(context)
     private val localFolderReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == LocalMediaPickerActivity.ACTION_FOLDER_SELECTED) {
                 updateLocalFolderBar()
                 if (selectedMediaTab == MediaPickerTab.LOCAL) {
+                    refresh()
+                }
+            }
+        }
+    }
+    private val stickerPackReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == StickerPackImportActivity.ACTION_PACK_IMPORTED) {
+                updatePackBar()
+                if (selectedMediaTab == MediaPickerTab.PACKS) {
                     refresh()
                 }
             }
@@ -222,6 +242,38 @@ class GifPickerView(
         localFolderBar.addView(localFolderText)
         localFolderBar.addView(chooseFolderButton)
 
+        packBar = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(smallPadding, dpToPx(3f), smallPadding, 0)
+            }
+            visibility = View.GONE
+        }
+        val importPackButton = TextView(context).apply {
+            text = "+"
+            gravity = Gravity.CENTER
+            textSize = 14f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.argb(50, 255, 255, 255))
+            setPadding(0, 0, 0, dpToPx(1f))
+            layoutParams = LinearLayout.LayoutParams(dpToPx(30f), dpToPx(24f)).apply {
+                marginEnd = dpToPx(3f)
+            }
+            setOnClickListener { openStickerPackImporter() }
+        }
+        packRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        packBar.addView(importPackButton)
+        packBar.addView(packRow)
+
         recyclerView = RecyclerView(context).apply {
             overScrollMode = View.OVER_SCROLL_ALWAYS
             clipToPadding = true
@@ -268,6 +320,7 @@ class GifPickerView(
         headerContainer.addView(searchField)
         headerContainer.addView(mediaTypeTabs)
         headerContainer.addView(localFolderBar)
+        headerContainer.addView(packBar)
         vertical.addView(headerContainer)
         vertical.addView(recyclerView)
 
@@ -335,7 +388,11 @@ class GifPickerView(
         val filter = IntentFilter(LocalMediaPickerActivity.ACTION_FOLDER_SELECTED)
         ContextCompat.registerReceiver(context, localFolderReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         localFolderReceiverRegistered = true
+        val packFilter = IntentFilter(StickerPackImportActivity.ACTION_PACK_IMPORTED)
+        ContextCompat.registerReceiver(context, stickerPackReceiver, packFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        stickerPackReceiverRegistered = true
         updateLocalFolderBar()
+        updatePackBar()
 
         refresh()
     }
@@ -470,6 +527,10 @@ class GifPickerView(
             runCatching { context.unregisterReceiver(localFolderReceiver) }
             localFolderReceiverRegistered = false
         }
+        if (stickerPackReceiverRegistered) {
+            runCatching { context.unregisterReceiver(stickerPackReceiver) }
+            stickerPackReceiverRegistered = false
+        }
     }
 
     private fun showPreview(item: KlipyGifResult) {
@@ -522,6 +583,7 @@ class GifPickerView(
                 selectedMediaTab = tab
                 refreshMediaTypeTabs()
                 updateLocalFolderBar()
+                updatePackBar()
                 refresh()
             }
         }
@@ -548,8 +610,49 @@ class GifPickerView(
         localFolderText.visibility = View.GONE
     }
 
+    private fun updatePackBar() {
+        val isPacks = selectedMediaTab == MediaPickerTab.PACKS
+        packBar.visibility = if (isPacks) View.VISIBLE else View.GONE
+        if (!isPacks) return
+        stickerPacks = stickerPackRepository.getPacks()
+        if (selectedStickerPackUri !in stickerPacks.map { it.uri.toString() }) {
+            selectedStickerPackUri = stickerPacks.firstOrNull()?.uri?.toString()
+        }
+        packRow.removeAllViews()
+        stickerPacks.forEach { pack ->
+            val selected = pack.uri.toString() == selectedStickerPackUri
+            val tab = TextView(context).apply {
+                text = pack.name
+                gravity = Gravity.CENTER
+                textSize = 10f
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(Color.WHITE)
+                setPadding(dpToPx(6f), dpToPx(3f), dpToPx(6f), dpToPx(3f))
+                setBackgroundColor(if (selected) Color.argb(70, 255, 255, 255) else Color.argb(24, 255, 255, 255))
+                layoutParams = LinearLayout.LayoutParams(0, dpToPx(24f), 1f).apply {
+                    marginStart = dpToPx(2f)
+                    marginEnd = dpToPx(2f)
+                }
+                setOnClickListener {
+                    selectedStickerPackUri = pack.uri.toString()
+                    updatePackBar()
+                    refresh()
+                }
+            }
+            packRow.addView(tab)
+        }
+    }
+
     private fun openLocalFolderPicker() {
         val intent = Intent(context, LocalMediaPickerActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }
+
+    private fun openStickerPackImporter() {
+        val intent = Intent(context, StickerPackImportActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
@@ -598,30 +701,32 @@ class GifPickerView(
         if (cancelExisting) {
             searchJob?.cancel()
         }
+        val generation = ++loadGeneration
         searchJob = coroutineScope.launch {
-            loadPage(reset = true)
+            loadPage(reset = true, generation = generation)
         }
     }
 
     private fun maybeLoadNextPage() {
-        if (selectedMediaTab.mediaType == null || selectedMediaTab == MediaPickerTab.LOCAL || loadingPage || reachedEnd || currentItems.isEmpty()) return
+        if (selectedMediaTab.mediaType == null || selectedMediaTab == MediaPickerTab.LOCAL || selectedMediaTab == MediaPickerTab.PACKS || loadingPage || reachedEnd || currentItems.isEmpty()) return
         val layoutManager = recyclerView.layoutManager as? GridLayoutManager ?: return
         val lastVisible = layoutManager.findLastVisibleItemPosition()
         if (lastVisible >= currentItems.size - (columns * 2)) {
             ensureActiveScope()
             coroutineScope.launch {
-                loadPage(reset = false)
+                loadPage(reset = false, generation = loadGeneration)
             }
         }
     }
 
-    private suspend fun loadPage(reset: Boolean) {
-        if (loadingPage) return
+    private suspend fun loadPage(reset: Boolean, generation: Int) {
+        if (loadingPage && !reset) return
         loadingPage = true
         if (reset) {
             currentPage = 0
             reachedEnd = false
             currentItems = emptyList()
+            resultAdapter.submitList(emptyList())
             loadingView.visibility = View.VISIBLE
             emptyView.visibility = View.GONE
             recyclerView.visibility = View.VISIBLE
@@ -642,6 +747,16 @@ class GifPickerView(
                     typeSnapshot == KlipyMediaType.LOCAL -> localMediaRepository.getItems().filter {
                         it.title.contains(querySnapshot, ignoreCase = true)
                     }
+                    tabSnapshot == MediaPickerTab.PACKS -> {
+                        val selectedPack = stickerPacks.firstOrNull { it.uri.toString() == selectedStickerPackUri }
+                            ?: stickerPackRepository.getPacks().firstOrNull()
+                        if (selectedPack == null) {
+                            emptyList()
+                        } else {
+                            selectedStickerPackUri = selectedPack.uri.toString()
+                            stickerPackRepository.getItems(selectedPack, querySnapshot, limit = 200)
+                        }
+                    }
                     typeSnapshot != null && querySnapshot.isBlank() -> gifClient.trending(
                         mediaType = typeSnapshot,
                         limit = pageSize,
@@ -657,6 +772,9 @@ class GifPickerView(
                 }
             }
 
+            if (generation != loadGeneration || querySnapshot != searchQuery || tabSnapshot != selectedMediaTab) {
+                return
+            }
             resultAdapter.favoriteKeys = favoriteKeys()
             loadingView.visibility = View.GONE
             if (reset && results.isEmpty()) {
@@ -665,6 +783,8 @@ class GifPickerView(
                 val message = when {
                     typeSnapshot == KlipyMediaType.LOCAL && localMediaRepository.getSelectedFolderUri() == null ->
                         context.getString(R.string.local_media_choose_folder_prompt)
+                    tabSnapshot == MediaPickerTab.PACKS ->
+                        context.getString(R.string.sticker_packs_empty_prompt)
                     tabSnapshot == MediaPickerTab.FAVORITES ->
                         context.getString(R.string.gif_picker_no_favorites)
                     querySnapshot.isNotBlank() ->
@@ -676,7 +796,7 @@ class GifPickerView(
                 return
             }
 
-            if (results.size < pageSize || typeSnapshot == KlipyMediaType.LOCAL || tabSnapshot == MediaPickerTab.FAVORITES) {
+            if (results.size < pageSize || typeSnapshot == KlipyMediaType.LOCAL || tabSnapshot == MediaPickerTab.FAVORITES || tabSnapshot == MediaPickerTab.PACKS) {
                 reachedEnd = true
             }
             if (results.isNotEmpty()) {
@@ -691,11 +811,15 @@ class GifPickerView(
                 }
             }
         } catch (e: CancellationException) {
-            loadingView.visibility = View.GONE
+            if (generation == loadGeneration) {
+                loadingView.visibility = View.GONE
+            }
             throw e
         } catch (_: Exception) {
-            loadingView.visibility = View.GONE
-            if (reset) {
+            if (generation == loadGeneration) {
+                loadingView.visibility = View.GONE
+            }
+            if (reset && generation == loadGeneration) {
                 currentItems = emptyList()
                 resultAdapter.submitList(emptyList())
                 showMessage(context.getString(R.string.gif_picker_error))
@@ -703,7 +827,9 @@ class GifPickerView(
                 reachedEnd = true
             }
         } finally {
-            loadingPage = false
+            if (generation == loadGeneration || !reset) {
+                loadingPage = false
+            }
         }
     }
 
@@ -742,7 +868,7 @@ private class GifResultAdapter(
             )
         }
         val preview = ImageView(context).apply {
-            scaleType = ImageView.ScaleType.CENTER_CROP
+            scaleType = ImageView.ScaleType.FIT_CENTER
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dpToPx(context, 88f)
