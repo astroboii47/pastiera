@@ -1,5 +1,26 @@
 # Changelog
 
+## Pastiera Enhanced 4.5
+
+Builds on this branch are posted here first for faster troubleshooting and testing. These changes are intended to be split into pull requests against the main Pastiera branch once they are stable enough for upstream review.
+
+### Added
+- Optional Raycast-style emoji and media picker.
+- Favourites and recent items in the media picker, with quick access to GIFs, stickers, local media, and packs.
+- Saved custom emoji font slots, including automatic migration of the existing Apple emoji font.
+- More emoji search terms across all supported languages.
+- Master switch for Quick Launcher shortcuts.
+
+### Fixed and Improved
+- Improved emoji search layout, selection, keyboard navigation, category menus, scrolling, and background fade.
+- Improved media picker layout and category menus to match the emoji picker.
+- Fixed missing and oversized emoji when using custom emoji fonts, including better handling of multi-person emoji.
+- Fixed local GIF sending in Messenger by using the current message field when the media is ready.
+- Fixed emoji and media search focus handling in Messenger.
+- Fixed Quick Launcher shortcuts firing after they were disabled.
+- Fixed occasional Alt characters appearing after an input field restarts.
+- Fixed auto-capitalisation not returning after sending a message in WhatsApp and similar apps.
+
 ## Pastiera Enhanced 4.4
 
 Builds on this branch are posted here first for faster troubleshooting and testing. These changes are intended to be split into pull requests against the main Pastiera branch once they are stable enough for upstream review.
