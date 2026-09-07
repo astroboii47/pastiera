@@ -1,15 +1,77 @@
+0️⃣	tecla: 0	0|cero|tecla
+1️⃣	tecla: 1	1|tecla|uno
+2️⃣	tecla: 2	2|dos|tecla
+3️⃣	tecla: 3	3|tecla|tres
+4️⃣	tecla: 4	4|cuatro|tecla
+5️⃣	tecla: 5	5|cinco|tecla
+6️⃣	tecla: 6	6|seis|tecla
+7️⃣	tecla: 7	7|siete|tecla
+8️⃣	tecla: 8	8|ocho|tecla
+9️⃣	tecla: 9	9|nueve|tecla
+©️	copyright	c|copyright|símbolo
+®️	marca registrada	marca registrada|r|símbolo de marca registrada
+‼️	exclamación doble	!!|exclamación|exclamación doble|puntuación|sorpresa
+⁉️	exclamación e interrogación	!|!?|?|exclamación|exclamación e interrogación|interrogación
+™️	símbolo de marca comercial	marca comercial|símbolo de marca comercial
+ℹ️	información	i|información
+↔️	flecha izquierda y derecha	derecha|dirección|flecha|flecha izquierda y derecha|izquierda
+↕️	flecha arriba y abajo	abajo|arriba|dirección|flecha|flecha arriba y abajo
+↖️	flecha hacia la esquina superior izquierda	arriba|dirección|flecha|flecha hacia la esquina superior izquierda|izquierda|noroeste
+↗️	flecha hacia la esquina superior derecha	arriba|derecha|dirección|flecha|flecha hacia la esquina superior derecha|noreste
+↘️	flecha hacia la esquina inferior derecha	abajo|derecha|dirección|flecha|flecha hacia la esquina inferior derecha|sudeste
+↙️	flecha hacia la esquina inferior izquierda	abajo|dirección|flecha|flecha hacia la esquina inferior izquierda|izquierda|suroeste
+↩️	flecha derecha curvándose a la izquierda	curva|dirección|flecha|flecha derecha curvándose a la izquierda|izquierda
+↪️	flecha izquierda curvándose a la derecha	curva|derecha|dirección|flecha|flecha izquierda curvándose a la derecha
 ⌚	reloj	reloj
 ⌛	reloj de arena sin tiempo	arena|reloj|reloj de arena sin tiempo|temporizador
+⌨️	teclado	ordenador|teclado
+⏏️	expulsar	botón|expulsar
 ⏩	avance rápido	avance rápido|avanzar|doble|flecha
 ⏪	retroceso rápido	flecha|flecha doble a la izquierda|izquierda|rebobinado|rebobinar|retroceso rápido
 ⏫	triángulo doble hacia arriba	arriba|flecha|triángulo doble hacia arriba
 ⏬	triángulo doble hacia abajo	triángulo|triángulo doble abajo|triángulo doble hacia abajo
+⏭️	pista siguiente	pista siguiente|raya vertical|siguiente|triángulos
+⏮️	pista anterior	atrás|escena anterior|pista anterior|triángulo
+⏯️	reproducir o pausa	pausa|reproducir|reproducir o pausa|triángulo
 ⏰	reloj despertador	alarma|despertador|reloj
+⏱️	cronómetro	cronómetro|reloj
+⏲️	temporizador	reloj|temporizador
 ⏳	reloj de arena con tiempo	reloj con arena cayendo|reloj de arena con tiempo|temporizador
+⏸️	pausa	barras|botón|pausa|vertical
+⏹️	detener	botón|cuadrado|detener|parar
+⏺️	grabar	botón|círculo|grabar
+Ⓜ️	m en círculo	círculo|m|m en círculo
+▪️	cuadrado negro pequeño	cuadrado|cuadrado negro pequeño|geometría|negro
+▫️	cuadrado blanco pequeño	blanco|cuadrado|cuadrado blanco pequeño|geometría
+▶️	reproducir	botón de reproducción|flecha|reproducir|triángulo
+◀️	retroceso	izquierda|retroceso|triángulo
+◻️	cuadrado blanco mediano	blanco|cuadrado|cuadrado blanco mediano|geometría
+◼️	cuadrado negro mediano	cuadrado|cuadrado negro mediano|geometría|negro
 ◽	cuadrado blanco mediano-pequeño	blanco|cuadrado|cuadrado blanco mediano-pequeño|geometría
 ◾	cuadrado negro mediano-pequeño	cuadrado|cuadrado negro mediano-pequeño|geometría|negro
+☀️	sol	espacio|rayos|sol|soleado
+☁️	nube	nube|tiempo
+☂️	paraguas	lluvia|paraguas|paraguas abierto
+☃️	muñeco de nieve con nieve	muñeco de nieve con nieve|nieve
+☄️	meteorito	cometa|espacio|meteorito
+☎️	teléfono	teléfono
+☑️	casilla con marca de verificación	✓|casilla|casilla con marca de verificación|marca|selección|verificación
 ☔	paraguas con gotas de lluvia	gotas|lluvia|paraguas|paraguas con gotas de lluvia
 ☕	bebida caliente	bebida|café|caliente|té
+☘️	trébol	planta|trébol
+☝️	dedo índice hacia arriba	apuntar|arriba|dedo|dedo índice hacia arriba|mano
+☠️	calavera y huesos cruzados	calavera|calavera y huesos cruzados|cara|huesos|muerte
+☢️	radiactivo	radiactividad|radiactivo|radioactividad|radioactivo|señal
+☣️	riesgo biológico	peligro|riesgo biológico|señal
+☦️	cruz ortodoxa	cruz|cruz ortodoxa|religión
+☪️	media luna y estrella	estrella|islam|luna|media luna y estrella|religión
+☮️	símbolo de la paz	paz|símbolo de la paz
+☯️	yin yang	religión|taoísmo|yang|yin
+☸️	rueda del dharma	budismo|dharma|religión|rueda|rueda del dharma
+☹️	cara con el ceño fruncido	cara|cara con el ceño fruncido|ceño|fruncido
+☺️	cara sonriente	cara|cara sonriente|contorno|relajado|sonrisa
+♀️	signo femenino	mujer|signo|signo femenino|símbolo
+♂️	signo masculino	hombre|signo|signo masculino|símbolo
 ♈	Aries	Aries|carnero|horóscopo|zodiaco
 ♉	Tauro	buey|horóscopo|Tauro|toro|zodiaco
 ♊	Géminis	gemelos|Géminis|horóscopo|zodiaco
@@ -22,44 +84,111 @@
 ♑	Capricornio	cabra|Capricornio|horóscopo|zodiaco
 ♒	Acuario	Acuario|agua|horóscopo|zodiaco
 ♓	Piscis	horóscopo|pescado|pez|Piscis|zodiaco
+♟️	peón de ajedrez	ajedrez|peón|peón de ajedrez
+♠️	palo de picas	carta|juego|palo|palo de picas|picas
+♣️	palo de tréboles	carta|juego|palo|palo de tréboles|tréboles
+♥️	palo de corazones	carta|corazones|juego|palo|palo de corazones
+♦️	palo de diamantes	carta|diamantes|juego|palo|palo de diamantes
+♨️	aguas termales	aguas termales|termas|vapor
+♻️	símbolo de reciclaje	reciclaje|reciclar|señal|símbolo de reciclaje|símbolo universal de reciclaje sólido|universal
+♾️	infinito	ilimitado|infinito|siempre|universal
 ♿	símbolo de silla de ruedas	acceso|señal|silla|silla de ruedas|símbolo|símbolo de silla de ruedas
+⚒️	martillo y pico	herramienta|martillo|martillo y pico|pico
 ⚓	ancla	ancla|barco|gancho
+⚔️	espadas cruzadas	arma|cruzadas|espadas
+⚕️	símbolo de medicina	asclepio|esculapio|medicina|serpiente|símbolo de medicina
+⚖️	balanza	balanza|justicia|libra|peso|zodiaco
+⚗️	alambique	alambique|herramienta|química
+⚙️	engranaje	engranaje|herramienta
+⚛️	símbolo de átomo	átomo|símbolo|símbolo de átomo
+⚜️	flor de lis	flor|flor de lis|lis
+⚠️	advertencia	advertencia|cuidado|señal
 ⚡	alto voltaje	alto voltaje|electricidad|peligro|peligro de alto voltaje|señal de alto voltaje|voltaje
+⚧️	símbolo de transgénero	símbolo de transgénero|transgénero
 ⚪	círculo blanco	círculo|círculo blanco|geometría
 ⚫	círculo negro	círculo|círculo negro|geometría
+⚰️	ataúd	ataúd|muerte
+⚱️	urna funeraria	funeraria|muerte|urna
 ⚽	balón de fútbol	balón|balón de fútbol|fútbol
 ⚾	béisbol	balón|baseball|béisbol|pelota
 ⛄	muñeco de nieve	muñeco de nieve|muñeco de nieve sin nieve|nieve
 ⛅	sol detrás de una nube	nube|sol|sol con nubes|sol detrás de una nube
+⛈️	nube con rayo y lluvia	lluvia|nube|nube con rayo y lluvia|trueno
 ⛎	Ofiuco	horóscopo|Ofiuco|portador|serpiente|zodiaco
+⛏️	pico	herramienta|mina|pico
+⛑️	casco con una cruz blanca	ayuda|cara|casco|casco con una cruz blanca|cruz
+⛓️	cadenas	cadena|cadenas
+⛓️‍💥	cadena rota	cadena|cadena rota|esposas|libertad|romper|rotura
 ⛔	dirección prohibida	dirección prohibida|no|prohibido|señal|señal de dirección prohibida
+⛩️	santuario sintoísta	japón|religión|santuario|santuario sintoísta|sintoísmo
 ⛪	iglesia	cristianismo|cruz|edificio|iglesia|religión
+⛰️	montaña	montaña|monte
+⛱️	sombrilla en la arena	arena|sol|sombrilla|sombrilla en la arena
 ⛲	fuente	fuente
 ⛳	banderín en hoyo	banderín|banderín en hoyo|golf|hoyo
+⛴️	ferri	barco|ferri|ferry
 ⛵	velero	barco|barco de vela|velero|yate
+⛷️	persona esquiando	esquí|esquiador|nieve|persona esquiando
+⛸️	patín de hielo	hielo|patín|patín de hielo
+⛹️	persona botando un balón	balón|botar|pelota|persona botando un balón
+⛹️‍♀️	mujer botando un balón	balón|botar|mujer|mujer botando un balón|pelota
+⛹️‍♂️	hombre botando un balón	balón|botar|hombre|hombre botando un balón|pelota
 ⛺	tienda de campaña	campaña|camping|tienda|tienda de campaña|vacaciones
 ⛽	surtidor de gasolina	bomba de gasolina|combustible|gasolina|surtidor|surtidor de gasolina
+✂️	tijeras	cortar|herramienta|tijeras
 ✅	botón de marca de verificación	✓|botón|botón de marca de verificación|marca|selección|verificación
+✈️	avión	aeroplano|avión
+✉️	sobre	carta|correo|sobre
 ✊	puño en alto	cerrado|mano|puñetazo|puño|puño en alto
 ✋	mano levantada	choca esos cinco|levantada|mano
+✌️	mano con señal de victoria	mano|mano con señal de victoria|señal de victoria|victoria
+✍️	mano escribiendo	escribir|lápiz|mano|mano escribiendo
+✏️	lápiz	escolar|escribir|lapicero|lápiz
+✒️	pluma negra	bolígrafo|escribir|pluma|pluma negra|tinta
+✔️	marca de verificación	✓|marca|marca de verificación|selección|verificación
+✖️	multiplicación	×|cancelar|marca|multiplicación|prohibido|signo de multiplicación|x
+✝️	cruz latina	cristianismo|cruz|cruz latina|religión
+✡️	estrella de David	David|estrella|judaísmo|judío|religión
 ✨	chispas	*|bengala|chispas|estrellas
+✳️	asterisco de ocho puntas	*|asterisco|asterisco de ocho puntas
+✴️	estrella de ocho puntas	*|estrella|estrella de ocho puntas
+❄️	copo de nieve	copo de nieve|frío|nieve
+❇️	chispa	*|chispa
 ❌	marca de cruz	×|cancelar|cruz|marca de cruz|marca de tachado|tachar|x
 ❎	botón con marca de cruz	×|botón con marca de cruz|casilla|cruz|marca|x
 ❓	interrogación roja	?|interrogación|interrogación roja|pregunta|puntuación|signo de interrogación
 ❔	interrogación blanca	?|interrogación|interrogación blanca|pregunta|puntuación
 ❕	exclamación blanca	!|exclamación|exclamación blanca|puntuación
 ❗	exclamación roja	!|exclamación|exclamación roja|puntuación|signo de exclamación
+❣️	exclamación de corazón	corazón|exclamación|exclamación de corazón|puntuación
+❤️	corazón rojo	corazón|emoción|rojo
+❤️‍🔥	corazón en llamas	amor|corazón|corazón en llamas|fuego|llamas|lujuria|pasión
+❤️‍🩹	corazón vendado	bien|corazón vendado|curarse|mejor|mejorar|recuperación|salud
 ➕	más	+|más|signo|suma
 ➖	menos	-|−|menos|resta|signo
 ➗	división	÷|división|signo|signo de división
+➡️	flecha hacia la derecha	derecha|dirección|este|flecha|flecha hacia la derecha
 ➰	bucle	bucle|giro|tirabuzón
 ➿	bucle doble	bucle|doble
+⤴️	flecha derecha curvándose hacia arriba	arriba|curva|dirección|flecha|flecha derecha curvándose hacia arriba
+⤵️	flecha derecha curvándose hacia abajo	abajo|curva|dirección|flecha|flecha derecha curvándose hacia abajo
+⬅️	flecha hacia la izquierda	flecha|flecha hacia la izquierda|izquierda|oeste
+⬆️	flecha hacia arriba	dirección|flecha|flecha arriba|flecha hacia arriba|norte
+⬇️	flecha hacia abajo	abajo|dirección|flecha|flecha hacia abajo|sur
 ⬛	cuadrado negro grande	cuadrado|cuadrado negro grande|geometría|negro
 ⬜	cuadrado blanco grande	blanco|cuadrado|cuadrado blanco grande|geometría
 ⭐	estrella	estelar|estrella
 ⭕	círculo rojo hueco	aro|círculo|círculo rojo hueco|o|rojo
+〰️	guion ondulado	guion|marca de sonido largo|ondulado
+〽️	marca de alternancia	alternancia|marca|marca de alternancia
+㊗️	ideograma japonés para "enhorabuena"	enhorabuena|ideograma|ideograma japonés para "enhorabuena"|japonés|kanji
+㊙️	ideograma japonés para "secreto"	ideograma|ideograma japonés para "secreto"|japonés|kanji|secreto
 🀄	dragón rojo de mahjong	dragón rojo|dragón rojo de mahjong|juego|mahjong
 🃏	comodín	comodín|joker
+🅰️	grupo sanguíneo A	A|grupo|sanguíneo|tipo A
+🅱️	grupo sanguíneo B	B|grupo|sanguíneo|tipo B
+🅾️	grupo sanguíneo tipo O	grupo sanguíneo|grupo sanguíneo tipo O|o
+🅿️	aparcamiento	aparcamiento|p|parking
 🆎	grupo sanguíneo AB	AB|grupo|sanguíneo|tipo AB
 🆑	borrar	borrar|símbolo
 🆒	botón COOL	botón|cool|mola
@@ -72,6 +201,7 @@
 🆙	botón UP!	arriba|botón UP!|información|novedad|símbolo|up
 🆚	botón VS	botón VS|contra|frente a|símbolo|versus|vs
 🈁	ideograma japonés para "aquí"	“aquí”|ideograma japonés para "aquí"|japonés|katakana
+🈂️	ideograma japonés para "de cortesía"	cortesía|ideograma japonés para "de cortesía"|japonés|katakana
 🈚	ideograma japonés para "gratis"	gratis|ideograma|ideograma japonés para "gratis"|japonés|kanji
 🈯	ideograma japonés para "reservado"	ideograma|ideograma japonés para "reservado"|japonés|kanji|reservado
 🈲	ideograma japonés para "prohibido"	ideograma|ideograma japonés para "prohibido"|japonés|kanji|prohibido
@@ -79,6 +209,7 @@
 🈴	ideograma japonés para "aprobado"	aprobado|ideograma|ideograma japonés para "aprobado"|japonés|kanji
 🈵	ideograma japonés para "completo"	completo|ideograma|ideograma japonés para "completo"|japonés|kanji|lleno
 🈶	ideograma japonés para "de pago"	“de pago”|ideograma|ideograma japonés para "de pago"|japonés|kanji
+🈷️	ideograma japonés para "cantidad mensual"	“cantidad mensual”|ideograma|ideograma japonés para "cantidad mensual"|japonés|kanji
 🈸	ideograma japonés para "aplicación"	aplicación|ideograma|ideograma japonés para "aplicación"|japonés|kanji
 🈹	ideograma japonés para "descuento"	descuento|ideograma|ideograma japonés para "descuento"|japonés|kanji
 🈺	ideograma japonés para "abierto"	abierto|ideograma|ideograma japonés para "abierto"|japonés|kanji
@@ -117,6 +248,16 @@
 🌞	sol con cara	brillante|cara|sol|sol con cara
 🌟	estrella brillante	brillante|estrella|resplandeciente
 🌠	estrella fugaz	estrella|estrella fugaz|lluvia
+🌡️	termómetro	temperatura|termómetro
+🌤️	sol detrás de una nube pequeña	nube|sol|sol detrás de una nube pequeña
+🌥️	sol detrás de una nube grande	nube|sol|sol detrás de una nube grande
+🌦️	sol detrás de una nube con lluvia	lluvia|nube|sol|sol detrás de una nube con lluvia
+🌧️	nube con lluvia	lluvia|nube|nube con lluvia
+🌨️	nube con nieve	frío|nieve|nube|nube con nieve
+🌩️	nube con rayo	nube|nube con rayo|rayo
+🌪️	tornado	nube|torbellino|tornado
+🌫️	niebla	niebla|nube
+🌬️	cara de viento	cara|cara de viento|nube|soplar|viento
 🌭	perrito caliente	perrito|perrito caliente|salchicha
 🌮	taco	comida|mexicano|taco
 🌯	burrito	burrito|comida|mexicano|tex mex|wrap
@@ -126,6 +267,7 @@
 🌳	árbol de hoja caduca	árbol|árbol de hoja caduca|caducifolio|hoja caduca
 🌴	palmera	árbol|árbol de palma|palmera
 🌵	cactus	cactus|planta
+🌶️	chile picante	chile|picante|planta
 🌷	tulipán	flor|tulipán
 🌸	flor de cerezo	cerezo|flor|flor de cerezo
 🌹	rosa	flor|rosa
@@ -198,6 +340,7 @@
 🍺	jarra de cerveza	bar|cerveza|jarra|jarra de cerveza|restaurante
 🍻	jarras de cerveza brindando	bar|cerveza|jarra|jarras|jarras de cerveza brindando|restaurante
 🍼	biberón	bebé|bibe|biberón|bibi|botella|leche
+🍽️	cuchillo y tenedor con un plato	cuchillo|cuchillo y tenedor con un plato|plato|restaurante|tenedor
 🍾	botella descorchada	bar|beber|botella|botella descorchada|cava|corcho
 🍿	palomitas	maíz|palomitas
 🎀	lazo	celebración|lazo
@@ -220,6 +363,13 @@
 🎑	ceremonia de contemplación de la luna	celebración|ceremonia de contemplación de la luna|contemplación|luna|tsukimi
 🎒	mochila escolar	colegio|mochila|mochila escolar
 🎓	birrete	birrete|celebración|gorro|graduación
+🎖️	medalla militar	celebración|medalla|militar
+🎗️	lazo conmemorativo	conmemorativo|lazo
+🎙️	micrófono de estudio	estudio|micrófono|micrófono de estudio|música
+🎚️	control de volumen	control|control de volumen|fader|volumen
+🎛️	ruedas de control	control|diales|música|potenciómetros|ruedas|ruedas de control
+🎞️	fotograma de película	cine|fotograma|fotograma de película|película
+🎟️	entradas	acceso|admisión|entrada|entradas|evento
 🎠	caballo de tiovivo	caballo|caballo de tiovivo|entretenimiento|tiovivo
 🎡	noria de feria	atracciones|entretenimiento|feria|noria|noria de feria
 🎢	montaña rusa	atracciones|entretenimiento|feria|montaña rusa|parque
@@ -256,18 +406,44 @@
 🏁	bandera de cuadros	bandera|bandera de cuadros|carreras|cuadros|deporte|motor
 🏂	practicante de snowboard	nieve|practicante de snowboard|snowboard
 🏃	persona corriendo	carrera|deporte|maratón|persona corriendo
+🏃‍♀️	mujer corriendo	carrera|correr|maratón|mujer|mujer corriendo
+🏃‍♂️	hombre corriendo	carrera|correr|hombre|hombre corriendo|maratón
 🏄	persona haciendo surf	persona haciendo surf|surf|surfear
+🏄‍♀️	mujer haciendo surf	mujer|mujer haciendo surf|surf|surfera|surfista
+🏄‍♂️	hombre haciendo surf	hombre|hombre haciendo surf|surf|surfero|surfista
 🏅	medalla deportiva	medalla|medalla deportiva|premio
 🏆	trofeo	premio|trofeo
 🏇	carrera de caballos	caballo|caballo de carreras|carrera de caballos|carreras|jinete
 🏈	balón de fútbol americano	balón|balón de fútbol americano|deporte|fútbol americano
 🏉	balón de rugby	balón|balón de rugby|deporte|rugby
 🏊	persona nadando	nadar|natación|persona nadando
+🏊‍♀️	mujer nadando	mujer|mujer nadando|nadar
+🏊‍♂️	hombre nadando	hombre|hombre nadando|nadar
+🏋️	persona levantando pesas	halterofilia|levantador|persona levantando pesas|pesas|peso
+🏋️‍♀️	mujer levantando pesas	halterofilia|levantadora de pesas|mujer|mujer levantando pesas|pesas
+🏋️‍♂️	hombre levantando pesas	halterofilia|hombre|hombre levantando pesas|levantador de pesas|pesas
+🏌️	persona jugando al golf	golf|golfista|pelota|persona jugando al golf
+🏌️‍♀️	mujer jugando al golf	golf|jugadora|mujer|mujer jugando al golf
+🏌️‍♂️	hombre jugando al golf	golf|hombre|hombre jugando al golf|jugador
+🏍️	moto	carreras|moto|motocicleta|vehículo
+🏎️	coche de carreras	carreras|coche|coche de carreras
 🏏	críquet	críquet|juego|pelota
 🏐	pelota de voleibol	balón|juego|pelota|pelota de voleibol|voleibol
 🏑	hockey sobre hierba	hierba|hockey|hockey sobre hierba|juego|palo|pelota
 🏒	hockey sobre hielo	disco|hielo|hockey|hockey sobre hielo|palo
 🏓	tenis de mesa	juego|mesa|pelota|ping pong|tenis de mesa
+🏔️	montaña con nieve	frío|montaña|montaña con nieve|nieve
+🏕️	camping	acampada|campamento|camping|vacaciones
+🏖️	playa y sombrilla	playa|playa y sombrilla|sombrilla
+🏗️	construcción	construcción|edificio|obra
+🏘️	casas	casas|edificio|urbanización
+🏙️	paisaje urbano	ciudad|edificio|paisaje|paisaje urbano
+🏚️	casa abandonada	abandonada|casa|deshabitada|inhabitada|vacía
+🏛️	edificio clásico	clásico|edificio
+🏜️	desierto	arena|desierto
+🏝️	isla desierta	desierta|isla
+🏞️	parque nacional	nacional|parque
+🏟️	estadio	estadio
 🏠	casa	casa|vivienda
 🏡	casa con jardín	casa|casa con jardín|construcción|jardín|vivienda
 🏢	edificio de oficinas	construcción|edificio|edificio de oficinas|oficinas
@@ -285,7 +461,13 @@
 🏮	lámpara japonesa	izakaya|lámpara japonesa|lámpara roja|linterna izakaya|linterna japonesa|restaurante
 🏯	castillo japonés	castillo|castillo japonés|construcción
 🏰	castillo europeo	castillo|castillo europeo|construcción
+🏳️	bandera blanca	bandera|blanca|ondear
+🏳️‍⚧️	bandera transgénero	azul|bandera|blanco|LGTB|rosa|transgénero
+🏳️‍🌈	bandera del arcoíris	arcoíris|bandera|bandera del arcoíris
 🏴	bandera negra	bandera|negra|ondear
+🏴‍☠️	bandera pirata	bandera pirata|botín|Jolly Roger|pirata|tesoro
+🏵️	roseta	flor|planta|roseta
+🏷️	etiqueta	etiqueta
 🏸	bádminton	bádminton|pluma|raqueta|volante
 🏹	arco y flecha	arco|arco y flecha|arquero|flecha|sagitario|zodiaco
 🏺	ánfora	acuario|ánfora|beber|jarra|zodiaco
@@ -353,10 +535,14 @@
 🐹	hámster	cara|hámster|mascota
 🐺	lobo	cara|lobo
 🐻	oso	cara|oso
+🐻‍❄️	oso polar	ártico|blanco|oso|polar
 🐼	panda	cara|oso panda|panda
 🐽	nariz de cerdo	cara|cerdo|morro|nariz|nariz de cerdo
 🐾	huellas de pezuñas	huellas|huellas de pezuñas|pezuñas
+🐿️	ardilla	ardilla
 👀	ojos	cara|ojos
+👁️	ojo	cuerpo|ojo
+👁️‍🗨️	ojo en bocadillo de texto	bocadillo de texto|ojo|ojo en bocadillo de texto|testigo
 👂	oreja	cuerpo|oreja
 👃	nariz	cuerpo|nariz
 👄	boca	boca|labios
@@ -396,6 +582,9 @@
 👦	niño	joven|niño
 👧	niña	chica|joven|niña
 👨	hombre	adulto|hombre
+👨‍⚕️	profesional sanitario hombre	doctor|enfermero|médico|profesional sanitario hombre|sanitario|terapeuta hombre
+👨‍⚖️	fiscal hombre	fiscal hombre|hombre|juez|justicia|magistrado
+👨‍✈️	piloto hombre	avión|capitán|hombre|piloto|vuelo
 👨‍🌾	profesional de la agricultura hombre	agricultor|campo|granjero|hombre|labrador|profesional de la agricultura hombre
 👨‍🍳	chef hombre	chef|cocinero|hombre|pinche
 👨‍🍼	hombre alimentando a bebé	alimentar|amamantar|bebé|hombre|hombre alimentando a bebé|lactancia
@@ -414,6 +603,9 @@
 👨‍🦼	hombre en silla de ruedas eléctrica	accesibilidad|hombre|hombre en silla de ruedas eléctrica|silla de ruedas
 👨‍🦽	hombre en silla de ruedas manual	accesibilidad|hombre|hombre en silla de ruedas manual|silla de ruedas
 👩	mujer	adulta|mujer
+👩‍⚕️	profesional sanitario mujer	doctora|enfermera|médica|profesional sanitario mujer|sanitaria|terapeuta mujer
+👩‍⚖️	fiscal mujer	fiscal mujer|jueza|justicia|magistrada|mujer
+👩‍✈️	piloto mujer	avión|capitana|mujer|piloto|vuelo
 👩‍🌾	profesional de la agricultura mujer	agricultora|campo|granjera|labradora|mujer|profesional de la agricultura mujer
 👩‍🍳	chef mujer	chef|cocinera|mujer|pinche
 👩‍🍼	mujer alimentando a bebé	alimentar|amamantar|bebé|lactancia|mujer|mujer alimentando a bebé
@@ -436,15 +628,27 @@
 👬	hombres de la mano	gays|hombres|hombres de la mano|novios|pareja
 👭	mujeres de la mano	lesbianas|mujeres|mujeres de la mano|novias|pareja
 👮	agente de policía	agente|agente de policía|personas|policía
+👮‍♀️	agente de policía mujer	agente|agente de policía mujer|mujer|poli|policía
+👮‍♂️	agente de policía hombre	agente|agente de policía hombre|hombre|poli|policía
 👯	personas con orejas de conejo	bailar|fiesta|orejas de conejo|personas|personas con orejas de conejo
+👯‍♀️	mujeres con orejas de conejo	bailar|fiesta|mujer|mujeres con orejas de conejo|orejas de conejo
+👯‍♂️	hombres con orejas de conejo	bailar|fiesta|hombre|hombres con orejas de conejo|orejas de conejo
 👰	persona con velo	boda|novia|persona|persona con velo|velo
+👰‍♀️	mujer con velo	boda|mujer|mujer con velo|novia|velo
+👰‍♂️	hombre con velo	boda|hombre|hombre con velo|novio|velo
 👱	persona adulta rubia	persona adulta rubia|rubia|rubias|rubio|rubios
+👱‍♀️	mujer rubia	mujer|rubia|rubiales
+👱‍♂️	hombre rubio	hombre|rubiales|rubio
 👲	persona con gorro chino	gorro|gua|gua pi mao|mao|persona|persona con gorro chino
 👳	persona con turbante	persona con turbante|turbante
+👳‍♀️	mujer con turbante	mujer|mujer con turbante|turbante
+👳‍♂️	hombre con turbante	hombre|hombre con turbante|turbante
 👴	anciano	anciano|hombre|mayor
 👵	anciana	anciana|mayor|mujer
 👶	bebé	bebé|joven|niño
 👷	profesional de la construcción	casco|construcción|obrero|profesional de la construcción|trabajador
+👷‍♀️	profesional de la construcción mujer	albañila|construcción|mujer|obrera|profesional de la construcción mujer|trabajadora
+👷‍♂️	profesional de la construcción hombre	albañil|construcción|hombre|obrero|profesional de la construcción hombre|trabajador
 👸	princesa	cuento|fantasía|hadas|princesa
 👹	demonio japonés oni	cara|cuento|cuernos|demonio japonés oni|sonrisa
 👺	demonio japonés tengu	cara|cuento|demonio japonés tengu|fantasía|monstruo|tengu
@@ -455,12 +659,20 @@
 👿	cara enfadada con cuernos	cara|cara enfadada con cuernos|cuernos|demonio|diablo
 💀	calavera	calavera|cara|cuento|monstruo|muerte
 💁	persona de mostrador de información	información|mano|mostrador|persona|persona de mostrador de información
+💁‍♀️	empleada de mostrador de información	empleada de mostrador de información|información|mano|mostrador|mujer
+💁‍♂️	empleado de mostrador de información	empleado de mostrador de información|hombre|información|mano|mostrador
 💂	guardia	guardia|guardia real británica
+💂‍♀️	guardia mujer	guardia|mujer|vigilante
+💂‍♂️	guardia hombre	guardia|hombre|vigilante
 💃	mujer bailando	bailar|mujer|mujer bailando
 💄	pintalabios	barra|cosmética|labios|maquillaje|pintalabios
 💅	pintarse las uñas	cosmética|esmalte|manicura|pintarse las uñas|uñas
 💆	persona recibiendo masaje	cara|facial|masaje|persona recibiendo masaje|salón
+💆‍♀️	mujer recibiendo masaje	cara|facial|masaje|mujer recibiendo masaje|salón
+💆‍♂️	hombre recibiendo masaje	cara|facial|hombre recibiendo masaje|masaje|salón
 💇	persona cortándose el pelo	belleza|corte|pelo|peluquero|persona cortándose el pelo
+💇‍♀️	mujer cortándose el pelo	belleza|corte|mujer cortándose el pelo|pelo|peluquero
+💇‍♂️	hombre cortándose el pelo	belleza|corte|hombre cortándose el pelo|pelo|peluquero
 💈	poste de barbero	barbería|barbero|peluquero|poste|poste de barbero
 💉	jeringuilla	aguja|jeringa|jeringuilla|medicina|médico
 💊	píldora	comprimido|medicina|médico|pastilla|píldora
@@ -578,6 +790,7 @@
 📺	televisión	televisión|tv
 📻	radio	radio
 📼	cinta de vídeo	cinta|cinta de vídeo
+📽️	proyector de cine	cine|película|proyector|proyector de cine
 📿	rosario	collar|cuentas|religión|rosario
 🔀	reproducción aleatoria	cruzado|flechas|flechas entrecruzadas|reproducción aleatoria
 🔁	repetir	flechas|repetición|repetir
@@ -640,6 +853,8 @@
 🔻	triángulo rojo hacia abajo	geometría|rojo|triángulo|triángulo hacia abajo rojo|triángulo rojo hacia abajo
 🔼	triángulo hacia arriba	arriba|botón|botón triángulo hacia arriba|triángulo|triángulo hacia arriba
 🔽	triángulo hacia abajo	abajo|botón|botón triángulo hacia abajo|triángulo|triángulo hacia abajo
+🕉️	om	hindú|om|religión
+🕊️	paloma	ave|pájaro|paloma|paz
 🕋	Kaaba	hach|islam|Kaaba|musulmán|religión|umrah
 🕌	mezquita	islam|mezquita|religión
 🕍	sinagoga	judaísmo|religión|sinagoga
@@ -668,10 +883,47 @@
 🕥	diez y media	10:30|diez y media|reloj
 🕦	once y media	11:30|once y media|reloj
 🕧	doce y media	12:30|doce y media|reloj
+🕯️	vela	luz|vela
+🕰️	reloj de sobremesa	reloj|reloj de sobremesa|sobremesa
+🕳️	agujero	agujero|orificio
+🕴️	persona trajeada levitando	levitar|negocios|persona|persona trajeada levitando|traje
+🕵️	detective	cara|detective|espía
+🕵️‍♀️	detective mujer	agente|detective|espía|investigadora|mujer
+🕵️‍♂️	detective hombre	agente|detective|espía|hombre|investigador
+🕶️	gafas de sol	gafas|gafas de sol|ojo|oscuras|sol
+🕷️	araña	araña|insecto
+🕸️	tela de araña	araña|tela|tela de araña|telaraña
+🕹️	joystick	joystick|juego|mando|palanca|videojuego
 🕺	hombre bailando	bailar|hombre|hombre bailando
+🖇️	clips unidos	clips|unidos|unión
+🖊️	bolígrafo	boli|bolígrafo|escribir
+🖋️	estilográfica	bolígrafo|escribir|estilográfica|pluma|tinta
+🖌️	pincel	pincel|pintar
+🖍️	lápiz de cera	cera|lápiz|lápiz de cera
+🖐️	mano abierta	abierta|dedo|mano
 🖕	dedo corazón hacia arriba	corazón|dedo|dedo corazón hacia arriba|mano|peineta
 🖖	saludo vulcano	mano|saludo|spock|vulcano
 🖤	corazón negro	corazón|negro
+🖥️	ordenador de sobremesa	ordenador|ordenador de sobremesa|sobremesa
+🖨️	impresora	impresora|ordenador
+🖱️	ratón de ordenador	ordenador|ratón|ratón de ordenador
+🖲️	bola de desplazamiento	bola de desplazamiento|ordenador|trackball
+🖼️	cuadro enmarcado	cuadro enmarcado|marco|museo
+🗂️	separador de fichas	fichas|fichero|separador|separador de fichas
+🗃️	archivador de tarjetas	archivador|archivador de tarjetas|archivo|caja
+🗄️	archivador	archivador|archivos|oficina|organizador
+🗑️	papelera	basura|cubo|papelera
+🗒️	bloc de notas de espiral	bloc|bloc de notas de espiral|cuaderno|espiral|notas
+🗓️	calendario de espiral	calendario|calendario de espiral|espiral
+🗜️	tornillo de banco	herramienta|tornillo|tornillo de banco
+🗝️	llave antigua	antigua|llave
+🗞️	periódico enrollado	noticias|papel|periódico|periódico enrollado
+🗡️	puñal	arma|cuchillo|daga|puñal
+🗣️	cabeza parlante	cabeza|cabeza parlante|cara|hablar|silueta
+🗨️	bocadillo de diálogo por la izquierda	bocadillo|bocadillo de diálogo por la izquierda|burbuja|conversación|diálogo
+🗯️	bocadillo de enfado por la derecha	bocadillo|bocadillo de enfado por la derecha|cabreo|enfado|rabia
+🗳️	urna con papeleta	papeleta|urna|urna con papeleta|voto
+🗺️	mapa mundial	mapa|mapa mundial|mapamundi|mundo
 🗻	monte Fuji	Fuji|montaña|monte|naturaleza
 🗼	Torre de Tokio	Tokio|torre|Torre de Tokio
 🗽	Estatua de la Libertad	estatua|Estatua de la Libertad|libertad|nueva|ny|nyc|york
@@ -734,6 +986,7 @@
 😵	cara mareada	cara|cara mareada|mareo
 😵‍💫	cara con ojos en espiral	cara con ojos en espiral|espiral|hipnotizado|indispuesto|mareado|mareo|problema
 😶	cara sin boca	boca|callado|cara|cara sin boca|silencio
+😶‍🌫️	cara entre las nubes	ausente|cabeza en las nubes|cara en la niebla|cara entre las nubes|en las nubes
 😷	cara con mascarilla médica	cara|cara con mascarilla médica|enfermo|malo|máscara
 😸	gato sonriendo con ojos sonrientes	cara|gato|gato sonriendo con ojos sonrientes|ojos|sonriente|sonrisa
 😹	gato llorando de risa	cara|gato|gato llorando de risa|lágrima|risa
@@ -746,18 +999,32 @@
 🙀	gato asustado	cara|gato|gato asustado|pánico|preocupación|sorpresa
 🙁	cara con el ceño ligeramente fruncido	cara|cara con el ceño ligeramente fruncido|ceño|fruncido
 🙂	cara sonriendo ligeramente	cara|cara sonriendo ligeramente|sonrisa
+🙂‍↔️	cabeza negando	cabeza moviéndose horizontalmente|cabeza negando|negar|no
+🙂‍↕️	cabeza asintiendo	asentir|cabeza asintiendo|cabeza moviéndose verticalmente|sí
 🙃	cara al revés	cara|cara al revés|revés
 🙄	cara con ojos en blanco	cara|cara con ojos en blanco|frustración|ojos|vueltos
 🙅	persona haciendo el gesto de "no"	gesto|mano|no|persona haciendo el gesto de "no"|prohibido
+🙅‍♀️	mujer haciendo el gesto de "no"	gesto|mano|mujer|mujer haciendo el gesto de "no"|prohibido
+🙅‍♂️	hombre haciendo el gesto de "no"	gesto|hombre|hombre haciendo el gesto de "no"|mano|prohibido
 🙆	persona haciendo el gesto de "de acuerdo"	gesto|mano|OK|persona haciendo el gesto de "de acuerdo"|vale
+🙆‍♀️	mujer haciendo el gesto de "de acuerdo"	gesto|mano|mujer haciendo el gesto de "de acuerdo"|OK|vale
+🙆‍♂️	hombre haciendo el gesto de "de acuerdo"	gesto|hombre haciendo el gesto de "de acuerdo"|mano|OK|vale
 🙇	persona haciendo una reverencia	disculpa|gesto|perdón|persona haciendo una reverencia|reverencia
+🙇‍♀️	mujer haciendo una reverencia	disculpa|gesto|mujer haciendo una reverencia|perdón|reverencia
+🙇‍♂️	hombre haciendo una reverencia	disculpa|gesto|hombre haciendo una reverencia|perdón|reverencia
 🙈	mono con los ojos tapados	cara|mal|mono|mono con los ojos tapados|prohibido
 🙉	mono con los oídos tapados	cara|mal|mono|mono con los oídos tapados|prohibido
 🙊	mono con la boca tapada	cara|mal|mono|mono con la boca tapada|prohibido
 🙋	persona con la mano levantada	feliz|gesto|levantar|mano|persona con la mano levantada
+🙋‍♀️	mujer con la mano levantada	gesto|levantar|mano|mujer|mujer con la mano levantada
+🙋‍♂️	hombre con la mano levantada	gesto|hombre|hombre con la mano levantada|levantar|mano
 🙌	manos levantadas celebrando	celebración|gesto|hurra|mano|manos levantadas celebrando
 🙍	persona frunciendo el ceño	ceño|fruncido|gesto|persona|persona frunciendo el ceño
+🙍‍♀️	mujer frunciendo el ceño	ceño|fruncido|gesto|mujer|mujer frunciendo el ceño
+🙍‍♂️	hombre frunciendo el ceño	ceño|fruncido|gesto|hombre|hombre frunciendo el ceño
 🙎	persona haciendo pucheros	gesto|persona|persona haciendo pucheros|pucheros
+🙎‍♀️	mujer haciendo pucheros	gesto|mujer|mujer haciendo pucheros|pucheros
+🙎‍♂️	hombre haciendo pucheros	gesto|hombre|hombre haciendo pucheros|pucheros
 🙏	manos en oración	gracias|mano|manos en oración|oración|orar|por favor|rezar
 🚀	cohete	cohete|espacio|vehículo
 🚁	helicóptero	aspas|helicóptero|rotores|vehículo|volar
@@ -795,6 +1062,8 @@
 🚡	teleférico	aéreo|teleférico|tranvía|vehículo
 🚢	barco	barco|vehículo
 🚣	persona remando en un bote	barca|bote|persona remando en un bote|remo
+🚣‍♀️	mujer remando en un bote	barca|bote|mujer|mujer remando en un bote|remo
+🚣‍♂️	hombre remando en un bote	barca|bote|hombre|hombre remando en un bote|remo
 🚤	lancha motora	barco|lancha motora|vehículo
 🚥	semáforo horizontal	luz|semáforo horizontal|señales de tráfico|tráfico
 🚦	semáforo	luz|semáforo|semáforo vertical|señales de tráfico|tráfico
@@ -812,8 +1081,14 @@
 🚲	bicicleta	bici|bicicleta|vehículo
 🚳	bicicletas prohibidas	bicicleta|bicicletas prohibidas|prohibido|vehículo
 🚴	persona en bicicleta	bicicleta|ciclismo|ciclista|persona en bicicleta
+🚴‍♀️	mujer en bicicleta	bicicleta|ciclismo|ciclista|mujer|mujer en bicicleta
+🚴‍♂️	hombre en bicicleta	bicicleta|ciclismo|ciclista|hombre|hombre en bicicleta
 🚵	persona en bicicleta de montaña	bicicleta|ciclista|montaña|mountain bike|persona en bicicleta de montaña
+🚵‍♀️	mujer en bicicleta de montaña	bicicleta|ciclista|montaña|mountain bike|mujer en bicicleta de montaña
+🚵‍♂️	hombre en bicicleta de montaña	bicicleta|ciclista|hombre en bicicleta de montaña|montaña|mountain bike
 🚶	persona caminando	andar|caminando|caminar|persona caminando
+🚶‍♀️	mujer caminando	andar|caminata|marcha|mujer|mujer caminando
+🚶‍♂️	hombre caminando	andar|caminata|hombre|hombre caminando|marcha
 🚷	prohibido el paso de peatones	peatón|peatones|prohibido|prohibido el paso de peatones|señal
 🚸	niños cruzando	cruzando|niños|señal
 🚹	aseo para hombres	aseo de caballeros|aseo para hombres|baño|señal|señal con un hombre|servicio
@@ -829,7 +1104,11 @@
 🛃	aduana	aduana
 🛄	recogida de equipajes	equipaje|maleta|recogida de equipajes
 🛅	consigna	consigna|depósito|equipaje|servicio de equipaje en depósito
+🛋️	sofá y lámpara	hotel|lámpara|sofá|sofá y lámpara
 🛌	persona en la cama	dormir|hotel|persona en la cama
+🛍️	bolsas de compras	bolsa|bolsas de compras|compra
+🛎️	timbre de hotel	botones|campanilla|hotel|timbre|timbre de hotel
+🛏️	cama	cama|dormir|hotel
 🛐	lugar de culto	culto|lugar de culto|religión
 🛑	señal de stop	octágono|parada|señal|señal de stop|stop
 🛒	carrito de la compra	carrito|carrito de la compra|carro|compra|supermercado
@@ -841,8 +1120,17 @@
 🛝	tobogán	jugar|parque|parque de atracciones|tobogán
 🛞	rueda	círculo|girar|neumático|rodar|rueda
 🛟	salvavidas	flotador|rescate|salvavidas|seguridad|socorrista
+🛠️	martillo y llave inglesa	herramienta|llave inglesa|martillo|martillo y llave inglesa
+🛡️	escudo	defensa|escudo
+🛢️	barril de petróleo	barril|barril de petróleo|bidón|petróleo
+🛣️	autopista	autopista|carretera
+🛤️	vía de tren	tren|vía|vía de tren
+🛥️	barco a motor	barco|barco a motor|motor|vehículo
+🛩️	avioneta	avión|avioneta
 🛫	avión despegando	aeroplano|avión|avión despegando|salida
 🛬	avión aterrizando	aeroplano|avión|avión aterrizando|llegada
+🛰️	satélite	espacio|satélite|vehículo
+🛳️	barco de pasajeros	barco|barco de pasajeros|pasajeros|vehículo
 🛴	patinete	patinete
 🛵	scooter	escúter|moto|scooter
 🛶	canoa	barca|barco|canoa|piragua
@@ -892,6 +1180,8 @@
 🤤	cara babeando	baba|babeando|cara
 🤥	cara de mentiroso	cara|cara de mentiroso|mentiroso|nariz|pinocho
 🤦	persona con la mano en la frente	facepalm|frente|incredulidad|mano|persona con la mano en la frente
+🤦‍♀️	mujer con la mano en la frente	facepalm|frente|incredulidad|mano|mujer con la mano en la frente
+🤦‍♂️	hombre con la mano en la frente	facepalm|frente|hombre con la mano en la frente|incredulidad|mano
 🤧	cara estornudando	cara|cara estornudando|estornudar|estornudo|pañuelo
 🤨	cara con ceja alzada	cara con ceja alzada|desconfiado|escéptico
 🤩	cara sonriendo con estrellas	cara|cara sonriendo con estrellas|estrellas|sonrisa
@@ -907,14 +1197,28 @@
 🤳	selfi	autofoto|cámara|selfi|selfie|teléfono
 🤴	príncipe	corona|príncipe
 🤵	persona con esmoquin	esmoquin|novio|persona|persona con esmoquin
+🤵‍♀️	mujer con esmoquin	esmoquin|mujer|mujer con esmoquin
+🤵‍♂️	hombre con esmoquin	esmoquin|hombre|hombre con esmoquin
 🤶	Mamá Noel	celebración|claus|cuento|fantasía|feliz|fiestas|madre|Mamá Noel|Navidad|santa
 🤷	persona encogida de hombros	duda|encogerse|hombros|indiferencia|persona encogida de hombros
+🤷‍♀️	mujer encogida de hombros	duda|encogerse|hombros|indiferencia|mujer encogida de hombros
+🤷‍♂️	hombre encogido de hombros	duda|encogerse|hombre encogido de hombros|hombros|indiferencia
 🤸	persona haciendo voltereta lateral	acrobacia|gimnasia|persona haciendo voltereta lateral|pirueta|rueda|voltereta
+🤸‍♀️	mujer dando una voltereta lateral	deporte|gimnasia|mujer|mujer dando una voltereta lateral|rueda|voltereta
+🤸‍♂️	hombre dando una voltereta lateral	deporte|gimnasia|hombre|hombre dando una voltereta lateral|rueda|voltereta
 🤹	persona haciendo malabares	equilibrio|malabares|malabarismo|malabarista|persona haciendo malabares
+🤹‍♀️	mujer haciendo malabares	malabares|malabarismo|malabarista|mujer|mujer haciendo malabares
+🤹‍♂️	hombre haciendo malabares	hombre|hombre haciendo malabares|malabares|malabarismo|malabarista
 🤺	persona haciendo esgrima	esgrima|esgrimista|espada|persona haciendo esgrima
 🤼	personas luchando	lucha|luchador|personas luchando
+🤼‍♀️	mujeres luchando	deporte|lucha|luchadora|mujer|mujeres luchando
+🤼‍♂️	hombres luchando	deporte|hombre|hombres luchando|lucha|luchador
 🤽	persona jugando al waterpolo	persona jugando al waterpolo|waterpolista|waterpolo
+🤽‍♀️	mujer jugando al waterpolo	agua|deporte|mujer jugando al waterpolo|waterpolista|waterpolo
+🤽‍♂️	hombre jugando al waterpolo	agua|deporte|hombre jugando al waterpolo|waterpolista|waterpolo
 🤾	persona jugando al balonmano	balonmanista|balonmano|persona jugando al balonmano
+🤾‍♀️	mujer jugando al balonmano	balonmanista|balonmano|deporte|mujer|mujer jugando al balonmano
+🤾‍♂️	hombre jugando al balonmano	balonmanista|balonmano|deporte|hombre|hombre jugando al balonmano
 🤿	máscara de buceo	bucear|buzo|esnórquel|máscara|máscara de buceo|tubo
 🥀	flor marchita	flor|marchita|marchitada|marchitarse
 🥁	tambor	baquetas|música|tambor
@@ -1032,7 +1336,11 @@
 🦶	pie	patada|pie|pisotón
 🦷	diente	dentista|diente|molar|muela
 🦸	personaje de superhéroe	bien|héroe|heroína|personaje de superhéroe|superhéroe|superheroína|superpoder
+🦸‍♀️	superheroína	bondad|héroe|heroína|mujer|superhéroe|superheroína|superpoder
+🦸‍♂️	superhéroe	bueno|héroe|hombre|superhéroe|superhombre|superpoder
 🦹	personaje de supervillano	mal|personaje de supervillano|superpoder|supervillana|supervillano|villana|villano
+🦹‍♀️	supervillana	mal|malvada|mujer|supervillana|villana
+🦹‍♂️	supervillano	hombre|mal|malvado|supervillano|villano
 🦺	chaleco de seguridad	chaleco|chaleco de seguridad|emergencia|seguridad
 🦻	oreja con audífono	accesibilidad|audífono|oreja con audífono|prótesis auditiva|sordo
 🦼	silla de ruedas eléctrica	accesibilidad|silla de ruedas eléctrica
@@ -1053,10 +1361,19 @@
 🧋	té de burbujas	boba|bubble tea|burbuja|leche|perla|té|té de burbujas
 🧌	trol	cuento de hadas|fantasía|monstruo|trol
 🧍	persona de pie	de pie|levantada|levantado|levantarse|persona de pie
+🧍‍♀️	mujer de pie	de pie|levantada|levantarse|mujer|mujer de pie
+🧍‍♂️	hombre de pie	de pie|hombre|hombre de pie|levantado|levantarse
 🧎	persona de rodillas	arrodillada|arrodillado|arrodillarse|de rodillas|persona de rodillas
+🧎‍♀️	mujer de rodillas	arrodillada|arrodillarse|de rodillas|mujer|mujer de rodillas
+🧎‍♂️	hombre de rodillas	arrodillado|arrodillarse|de rodillas|hombre|hombre de rodillas
 🧏	persona sorda	accesibilidad|escuchar|oído|oír|persona sorda|sordera
+🧏‍♀️	mujer sorda	mujer|sorda|sordera
+🧏‍♂️	hombre sordo	hombre|sordera|sordo
 🧐	cara con monóculo	aristocrático|cara con monóculo|estirado
 🧑	persona adulta	género|neutro|persona adulta
+🧑‍⚕️	profesional sanitario	doctor|enfermero|médico|profesional sanitario|salud|terapeuta
+🧑‍⚖️	fiscal	fiscal|juez|juicio|magistrado
+🧑‍✈️	piloto	avión|capitán|piloto|vuelo
 🧑‍🌾	profesional de la agricultura	agricultor|cultivador|granjero|jardinero|labrador|profesional de la agricultura
 🧑‍🍳	chef	chef|cocinero|cocinillas|guisandero|pinche
 🧑‍🍼	persona alimentando a bebé	alimentar|amamantar|bebé|lactancia|persona|persona alimentando a bebé
@@ -1084,17 +1401,39 @@
 🧒	infante	crío|género|infante|joven|neutro
 🧓	persona mayor	adulto|género neutro|género no especificado|maduro|mayor|persona mayor
 🧔	persona con barba	barbas|barbudo|persona|persona con barba
+🧔‍♀️	mujer: barba	barba|mujer|mujer: barba
+🧔‍♂️	hombre: barba	barba|hombre|hombre: barba
 🧕	mujer con hiyab	hiyab|mujer con hiyab|pañuelo
 🧖	persona en una sauna	persona en una sauna|sauna|vapor
+🧖‍♀️	mujer en una sauna	mujer en una sauna|sauna|vapor
+🧖‍♂️	hombre en una sauna	hombre en una sauna|sauna|vapor
 🧗	persona escalando	alpinista|escalador|persona escalando
+🧗‍♀️	mujer escalando	alpinista|escaladora|mujer escalando
+🧗‍♂️	hombre escalando	alpinista|escalador|hombre escalando
 🧘	persona en posición de loto	meditación|persona en posición de loto|yoga
+🧘‍♀️	mujer en posición de loto	meditación|mujer en posición de loto|yoga
+🧘‍♂️	hombre en posición de loto	hombre en posición de loto|meditación|yoga
 🧙	persona maga	bruja|brujo|hechicera|hechicero|persona maga
+🧙‍♀️	maga	bruja|hechicera|maga
+🧙‍♂️	mago	brujo|hechicero|mago
 🧚	hada	campanilla|hada|oberón|puck|titania
+🧚‍♀️	hada mujer	campanilla|hada|hada mujer|titania
+🧚‍♂️	hada hombre	hada|hada hombre|oberón|puck
 🧛	vampiro	drácula|muerto viviente|no muerto|vampiro
+🧛‍♀️	vampiresa	muerta viviente|no muerta|vampiresa
+🧛‍♂️	vampiro hombre	drácula|muerto viviente|no muerto|vampiro hombre
 🧜	persona sirena	persona sirena|sirena|tritón
+🧜‍♀️	sirena	sirena
+🧜‍♂️	sirena hombre	sirena|sirena hombre|tritón
 🧝	elfo	elfo|mágico
+🧝‍♀️	elfa	elfa|mágico|mujer
+🧝‍♂️	elfo hombre	elfo|elfo hombre|mágico
 🧞	genio	genio|lámpara
+🧞‍♀️	genio mujer	genio|genio mujer|lámpara
+🧞‍♂️	genio hombre	djinn|genio|genio hombre|lámpara
 🧟	zombi	muerto viviente|no muerto|zombi
+🧟‍♀️	zombi mujer	caminante|muerta viviente|no muerta|zombi mujer
+🧟‍♂️	zombi hombre	caminante|muerto viviente|no muerto|zombi hombre
 🧠	cerebro	cerebro|inteligente
 🧡	corazón naranja	corazón|emoción|naranja
 🧢	gorra con visera	béisbol|gorra|gorra con visera|visera

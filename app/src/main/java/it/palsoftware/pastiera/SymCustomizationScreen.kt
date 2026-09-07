@@ -62,11 +62,17 @@ fun SymCustomizationScreen(
     var emojiPickerExpandedHeight by remember {
         mutableStateOf(SettingsManager.getEmojiPickerExpandedHeight(context))
     }
+    var emojiPickerRaycastStyle by remember {
+        mutableStateOf(SettingsManager.getEmojiPickerRaycastStyle(context))
+    }
     var customEmojiFontEnabled by remember {
         mutableStateOf(SettingsManager.getEmojiPickerCustomFontEnabled(context))
     }
     var customEmojiFontName by remember {
         mutableStateOf(SettingsManager.getEmojiPickerCustomFontName(context))
+    }
+    var customEmojiFontSlots by remember {
+        mutableStateOf(CustomEmojiFontManager.getFontSlots(context))
     }
     val customEmojiFontImportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -77,6 +83,7 @@ fun SymCustomizationScreen(
         }.onSuccess { displayName ->
             customEmojiFontEnabled = true
             customEmojiFontName = displayName
+            customEmojiFontSlots = CustomEmojiFontManager.getFontSlots(context)
             Toast.makeText(context, context.getString(R.string.emoji_picker_custom_font_imported, displayName), Toast.LENGTH_SHORT).show()
         }.onFailure { error ->
             Toast.makeText(context, error.message ?: context.getString(R.string.emoji_picker_custom_font_import_failed), Toast.LENGTH_LONG).show()
@@ -557,6 +564,46 @@ fun SymCustomizationScreen(
         Surface(
             modifier = Modifier.fillMaxWidth()
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Keyboard,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.emoji_picker_raycast_style_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = stringResource(R.string.emoji_picker_raycast_style_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2
+                    )
+                }
+                Switch(
+                    checked = emojiPickerRaycastStyle,
+                    onCheckedChange = { enabled ->
+                        emojiPickerRaycastStyle = enabled
+                        SettingsManager.setEmojiPickerRaycastStyle(context, enabled)
+                    }
+                )
+            }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -617,6 +664,33 @@ fun SymCustomizationScreen(
                     modifier = Modifier.align(Alignment.End)
                 ) {
                     Text(stringResource(R.string.emoji_picker_custom_font_import))
+                }
+                if (customEmojiFontSlots.isNotEmpty()) {
+                    Text(
+                        text = stringResource(R.string.emoji_picker_custom_font_slots),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    customEmojiFontSlots.forEach { slot ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = SettingsManager.getEmojiPickerCustomFontPath(context) == slot.path,
+                                onClick = {
+                                    CustomEmojiFontManager.selectFontSlot(context, slot)
+                                    customEmojiFontName = slot.displayName
+                                    customEmojiFontEnabled = true
+                                }
+                            )
+                            Text(
+                                text = slot.displayName,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
                 }
             }
         }

@@ -100,6 +100,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             activeInstance?.syncSymAsCtrlHoldFromAccessibility(active)
         }
 
+        fun notifyAccessibilityEditorClicked() {
+            activeInstance?.releaseEmojiSearchForExternalEditor()
+        }
+
         private val MESSENGER_ENTER_BEHAVIOR_PACKAGES = setOf(
             "com.whatsapp",
             "org.telegram.messenger",
@@ -223,6 +227,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     private var isInputViewActive = false
     private var emojiSearchExternalSelectionStart: Int? = null
     private var emojiSearchExternalSelectionEnd: Int? = null
+    private var emojiPickerReceivedInput: Boolean = false
     private var emojiSearchCursorAnchorMonitoringRequested: Boolean = false
     private var ignoreNextEmojiSearchCursorAnchorUpdate: Boolean = false
     
@@ -972,12 +977,6 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         consumeCtrlState: Boolean = false
     ): Boolean {
         inputConnection.finishComposingText()
-        // Skip autocorrection when Enter is mapped to an IME action.
-        textInputController.handleAutoCapAfterEnter(
-            keyCode,
-            inputConnection,
-            inputContextState.shouldDisableAutoCapitalize
-        ) { updateStatusBarText() }
         val performed = inputConnection.performEditorAction(actionId)
         if (performed) {
             if (consumeCtrlState) {
@@ -990,6 +989,11 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                 updateStatusBarText()
             }
             suggestionController.onContextReset()
+            // Messaging apps clear their composer after accepting the send action. Check the
+            // resulting empty editor, rather than the message text that existed before send.
+            if (!inputContextState.shouldDisableAutoCapitalize) {
+                scheduleAutoCapitalizeAtCursor()
+            }
             notifyDebugKeyEvent(
                 keyCode,
                 event,
@@ -1079,9 +1083,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
     }
 
     private fun sendGifResult(result: KlipyGifResult) {
-        val inputConnection = currentInputConnection
-        val editorInfo = currentInputEditorInfo
-        if (inputConnection == null) {
+        if (currentInputConnection == null) {
             if (gifContentSender.hasTextFallback(result)) {
                 gifContentSender.copyFallbackLink(result)
                 Toast.makeText(this, getString(R.string.gif_picker_link_copied, result.mediaType.singularName), Toast.LENGTH_SHORT).show()
@@ -1092,6 +1094,19 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         }
 
         CoroutineScope(Dispatchers.Main).launch {
+            // Media preparation is asynchronous. Resolve the target again immediately before
+            // committing so Messenger receives content through its current editor connection.
+            val inputConnection = currentInputConnection
+            val editorInfo = currentInputEditorInfo
+            if (inputConnection == null) {
+                if (gifContentSender.hasTextFallback(result)) {
+                    gifContentSender.copyFallbackLink(result)
+                    Toast.makeText(this@PhysicalKeyboardInputMethodService, getString(R.string.gif_picker_link_copied, result.mediaType.singularName), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@PhysicalKeyboardInputMethodService, getString(R.string.gif_picker_not_supported, result.mediaType.singularName), Toast.LENGTH_SHORT).show()
+                }
+                return@launch
+            }
             val shouldTryCommit = gifContentSender.supportsMediaCommit(editorInfo, result) ||
                 result.mimeType.equals("image/gif", ignoreCase = true) ||
                 (result.isLocal && result.mimeType.startsWith("image/", ignoreCase = true))
@@ -1100,8 +1115,9 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                     val preparedMedia = withContext(Dispatchers.IO) {
                         gifContentSender.prepareMedia(result)
                     }
-                    val nonNullEditorInfo = editorInfo ?: return@runCatching false
-                    gifContentSender.commitPreparedGif(preparedMedia, inputConnection, nonNullEditorInfo)
+                    val latestInputConnection = currentInputConnection ?: return@runCatching false
+                    val latestEditorInfo = currentInputEditorInfo ?: return@runCatching false
+                    gifContentSender.commitPreparedGif(preparedMedia, latestInputConnection, latestEditorInfo)
                 }.getOrDefault(false)
             } else {
                 false
@@ -1115,7 +1131,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                 ).show()
             } else if (gifContentSender.hasTextFallback(result)) {
                 runCatching {
-                    gifContentSender.insertFallbackLink(result, inputConnection)
+                    gifContentSender.insertFallbackLink(result, currentInputConnection)
                 }
                 Toast.makeText(
                     this@PhysicalKeyboardInputMethodService,
@@ -1864,6 +1880,18 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             Log.e(TAG, "Error reloading nav mode mappings", e)
         }
     }
+
+    /** Resolves the existing user-configured Nav Mode mapping to a picker arrow. */
+    private fun resolveEmojiPickerNavKeyCode(mapping: KeyMappingLoader.CtrlMapping?): Int? {
+        if (mapping?.type != "keycode") return null
+        return when (mapping.value) {
+            "DPAD_UP" -> KeyEvent.KEYCODE_DPAD_UP
+            "DPAD_DOWN" -> KeyEvent.KEYCODE_DPAD_DOWN
+            "DPAD_LEFT" -> KeyEvent.KEYCODE_DPAD_LEFT
+            "DPAD_RIGHT" -> KeyEvent.KEYCODE_DPAD_RIGHT
+            else -> null
+        }
+    }
     
     /**
      * Checks if a keycode corresponds to an alphabetic key (A-Z).
@@ -2288,9 +2316,24 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             isNavModeLatched = { ctrlLatchFromNavMode },
             currentInputConnection = { currentInputConnection },
             isInputViewShown = { isInputViewShown },
-            attachInputView = { view -> setInputView(view) },
+            attachInputView = { view ->
+                Log.d(
+                    TAG,
+                    "IME_WINDOW attachInputView pkg=${currentInputEditorInfo?.packageName} " +
+                        "nav=${navModeController.isNavModeActive()} shown=$isInputViewShown"
+                )
+                setInputView(view)
+            },
             setCandidatesViewShown = { shown -> setCandidatesViewShown(shown) },
-            requestShowInputView = { requestShowSelf(0) },
+            requestShowInputView = {
+                Log.d(
+                    TAG,
+                    "IME_WINDOW requestShowSelf pkg=${currentInputEditorInfo?.packageName} " +
+                        "nav=${navModeController.isNavModeActive()} active=$isInputViewActive " +
+                        "shown=$isInputViewShown caller=${Throwable().stackTrace.take(8).joinToString(" <- ") { it.methodName }}"
+                )
+                requestShowSelf(0)
+            },
             refreshStatusBar = { refreshStatusBar() }
         )
         launcherShortcutController = LauncherShortcutController(this)
@@ -2790,7 +2833,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         }
         val downHandled = dispatchSoftwareKeyboardSyntheticKey(keyCode, KeyEvent.ACTION_DOWN)
         val upHandled = dispatchSoftwareKeyboardSyntheticKey(keyCode, KeyEvent.ACTION_UP)
-        if ((downHandled || upHandled) && SettingsManager.isQuickLauncherShortcut(this, keyCode)) {
+        if ((downHandled || upHandled) && SettingsManager.isQuickLauncherShortcutEnabled(this, keyCode)) {
             candidatesBarController.cancelSoftwareKeyboardTouchState()
         }
         if (consumeCtrlOneShotAfterStroke && (downHandled || upHandled)) {
@@ -2946,6 +2989,11 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
      */
     override fun onEvaluateInputViewShown(): Boolean {
         val shouldShowInputView = super.onEvaluateInputViewShown()
+        Log.d(
+            TAG,
+            "IME_WINDOW evaluate pkg=${currentInputEditorInfo?.packageName} " +
+                "system=$shouldShowInputView nav=${navModeController.isNavModeActive()}"
+        )
         return keyboardVisibilityController.onEvaluateInputViewShown(shouldShowInputView)
     }
 
@@ -2972,13 +3020,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         return false
     }
 
-    @Deprecated("Deprecated Android callback; kept to clear emoji search capture when the target view is clicked.")
+    @Deprecated("Deprecated Android callback; used to return picker input to a clicked app editor.")
     @Suppress("DEPRECATION")
     override fun onViewClicked(focusChanged: Boolean) {
         super.onViewClicked(focusChanged)
-        if (symPage == 4 && ::candidatesBarController.isInitialized) {
-            disableEmojiSearchInputCapture()
-        }
         if ((symPage == 4 || symPage == 5) && ::candidatesBarController.isInitialized) {
             candidatesBarController.disableGifPickerSearchInputCapture()
         }
@@ -2993,11 +3038,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         ) {
             return
         }
-        if (ignoreNextEmojiSearchCursorAnchorUpdate) {
-            ignoreNextEmojiSearchCursorAnchorUpdate = false
-            return
-        }
-        disableEmojiSearchInputCapture()
+        // Apps such as Messenger emit cursor-anchor updates while the picker opens and
+        // after every app-editor change. They do not mean the user left picker search.
+        // Keep the capture alive until the picker itself explicitly closes it.
+        ignoreNextEmojiSearchCursorAnchorUpdate = false
     }
 
     /**
@@ -3030,9 +3074,22 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         }
         emojiSearchExternalSelectionStart = null
         emojiSearchExternalSelectionEnd = null
+        emojiPickerReceivedInput = false
         emojiSearchCursorAnchorMonitoringRequested = false
         ignoreNextEmojiSearchCursorAnchorUpdate = false
         currentInputConnection?.requestCursorUpdates(0)
+    }
+
+    private fun releaseEmojiSearchForExternalEditor() {
+        uiHandler.post {
+            if (
+                symPage == 4 &&
+                ::candidatesBarController.isInitialized &&
+                candidatesBarController.isEmojiPickerSearchInputActive()
+            ) {
+                disableEmojiSearchInputCapture()
+            }
+        }
     }
 
     private fun updateEmojiSearchExternalSelectionSnapshot(inputConnection: InputConnection?) {
@@ -3435,6 +3492,15 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         val isEditable = state.isEditable
         val isReallyEditable = state.isReallyEditable
         isInputViewActive = isEditable
+        if (restarting) {
+            // Android can restart an editor without delivering the modifier key-up that belonged
+            // to the old connection. Never carry a transient Alt press/one-shot into new typing.
+            modifierStateController.clearTransientAltState()
+            modifierDownTimes.remove(KeyEvent.KEYCODE_ALT_LEFT)
+            modifierDownTimes.remove(KeyEvent.KEYCODE_ALT_RIGHT)
+            modifierStateBeforeHold = null
+            lastAltTapUpTime = 0L
+        }
         if (isEditable) {
             if (!restarting) {
                 deferInitialVariationContextRead()
@@ -3579,7 +3645,12 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
 
         if (isEditable) {
             updateStatusBarText()
-            Q25MessengerFocusAccessibilityService.requestMessengerRefocus(this, info?.packageName)
+            // The Messenger accessibility helper clicks the app composer to recover its
+            // focus. While a picker search is open, that click is an external-editor
+            // event and disables the picker search capture.
+            if (symPage !in listOf(4, 5)) {
+                Q25MessengerFocusAccessibilityService.requestMessengerRefocus(this, info?.packageName)
+            }
         }
 
         // Check if trackpad gestures should be started
@@ -4201,18 +4272,6 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             variationStateController.markCursorContextUnknown()
         }
 
-        if (
-            symPage == 4 &&
-            ::candidatesBarController.isInitialized &&
-            candidatesBarController.isEmojiPickerSearchInputActive() &&
-            !shouldSkipForCommit
-        ) {
-            // This callback comes from the app editor, not from the internal emoji search EditText.
-            // Any external selection/cursor update means hardware typing should return to the app
-            // until the user explicitly focuses the emoji search field again.
-            disableEmojiSearchInputCapture()
-        }
-        
         if (cursorPositionChanged && collapsedSelection && !shouldSkipForCommit) {
             // Update suggestions on cursor movement (if suggestions enabled)
             if (!state.shouldDisableSuggestions) {
@@ -4557,9 +4616,9 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                 candidatesBarController.isGifPickerSearchInputActive()
         if (emojiSearchCandidateActive) {
             ensureEmojiSearchCursorAnchorMonitoring(initialInputConnection)
-            if (shouldReturnEmojiSearchFocusToApp(initialInputConnection)) {
-                disableEmojiSearchInputCapture()
-            }
+            // Some editors emit a transient cursor update as the picker opens.
+            // Keep picker capture active so the first typed character is not lost.
+            updateEmojiSearchExternalSelectionSnapshot(initialInputConnection)
         }
         if (
             gifSearchCandidateActive &&
@@ -4569,6 +4628,29 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
         }
         // Let the picker handle text-editing shortcuts before the generic Ctrl router can
         // touch the app editor selection.
+        val emojiPickerNavKeyCode = if (emojiSearchCandidateActive && emojiSearchCtrlActive) {
+            resolveEmojiPickerNavKeyCode(ctrlKeyMap[keyCode])
+        } else {
+            null
+        }
+        if (emojiPickerNavKeyCode != null && event != null) {
+            val navEvent = KeyEvent(
+                event.downTime,
+                event.eventTime,
+                event.action,
+                emojiPickerNavKeyCode,
+                event.repeatCount,
+                event.metaState,
+                event.deviceId,
+                event.scanCode,
+                event.flags,
+                event.source
+            )
+            if (candidatesBarController.handleEmojiPickerSearchKeyDown(navEvent, false)) {
+                emojiPickerReceivedInput = true
+                return true
+            }
+        }
         if (
             emojiSearchCandidateActive &&
             candidatesBarController.isEmojiPickerSearchInputActive() &&
@@ -4579,11 +4661,14 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                     getCharacterFromLayout(
                         typedEvent.keyCode,
                         typedEvent,
-                        isShiftModifierActive(typedEvent)
+                        // Picker search must not inherit the app editor's auto-shift.
+                        // Only a physically held Shift changes a search character.
+                        typedEvent.isShiftPressed
                     )?.toString()
                 }
             )
         ) {
+            emojiPickerReceivedInput = true
             updateEmojiSearchExternalSelectionSnapshot(initialInputConnection)
             ensureEmojiSearchCursorAnchorMonitoring(initialInputConnection)
             return true
@@ -4609,6 +4694,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
                 toggleMinimalUi = { keyboardVisibilityController.toggleUserMinimalUi() }
             )
             if (handled) {
+                emojiPickerReceivedInput = true
                 updateEmojiSearchExternalSelectionSnapshot(initialInputConnection)
                 ensureEmojiSearchCursorAnchorMonitoring(initialInputConnection)
                 return true
@@ -4661,7 +4747,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             !symAsCtrlTextFieldHoldActive &&
             (symTogglePendingOnKeyUp || event?.isSymPressed == true) &&
             SettingsManager.getQuickLauncherTextFieldShortcuts(this) &&
-            SettingsManager.isQuickLauncherShortcut(this, keyCode) &&
+            SettingsManager.isQuickLauncherShortcutEnabled(this, keyCode) &&
             event?.repeatCount == 0
         ) {
             symChordUsedSinceKeyDown = true
@@ -5151,14 +5237,17 @@ class PhysicalKeyboardInputMethodService : InputMethodService() {
             !isPureModifierKey(keyCode) &&
             ::candidatesBarController.isInitialized &&
             candidatesBarController.isEmojiPickerSearchInputActive() &&
-            candidatesBarController.shouldConsumeEmojiPickerSearchKeyUp(
-                event,
-                event?.isCtrlPressed == true ||
-                    ctrlPressed ||
-                    ctrlPhysicallyPressed ||
-                    ctrlLatchActive ||
-                    ctrlOneShot ||
-                    ctrlLatchFromNavMode
+            (
+                resolveEmojiPickerNavKeyCode(ctrlKeyMap[keyCode]) != null ||
+                    candidatesBarController.shouldConsumeEmojiPickerSearchKeyUp(
+                        event,
+                        event?.isCtrlPressed == true ||
+                            ctrlPressed ||
+                            ctrlPhysicallyPressed ||
+                            ctrlLatchActive ||
+                            ctrlOneShot ||
+                            ctrlLatchFromNavMode
+                    )
             )
         ) {
             return true

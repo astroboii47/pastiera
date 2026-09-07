@@ -91,6 +91,9 @@ fun CustomizationSettingsScreen(
     var unifiedModeEnabled by remember {
         mutableStateOf(SettingsManager.getUnifiedSuggestionsVariationsBar(context))
     }
+    var quickLauncherEnabled by remember {
+        mutableStateOf(SettingsManager.getQuickLauncherEnabled(context))
+    }
     var launcherShortcutsEnabled by remember {
         mutableStateOf(SettingsManager.getLauncherShortcutsEnabled(context))
     }
@@ -826,6 +829,11 @@ fun CustomizationSettingsScreen(
                     },
                     quickLauncherDefaultBlocked = quickLauncherDefaultBlocked,
                     quickLauncherShortcutKey = quickLauncherShortcutKey,
+                    quickLauncherEnabled = quickLauncherEnabled,
+                    onQuickLauncherEnabledChanged = { enabled ->
+                        quickLauncherEnabled = enabled
+                        SettingsManager.setQuickLauncherEnabled(context, enabled)
+                    },
                     onOpenBehavior = { navigateTo(CustomizationDestination.LauncherShortcutBehavior) },
                     onOpenCosmetic = { navigateTo(CustomizationDestination.LauncherShortcutCosmetic) },
                     onManageAssignments = { navigateTo(CustomizationDestination.LauncherShortcutAssignments) }
@@ -977,6 +985,8 @@ private fun StarterLauncherShortcutsSettingsScreen(
     onQuickLauncherLimitResultsChanged: (Boolean) -> Unit,
     quickLauncherDefaultBlocked: Boolean,
     quickLauncherShortcutKey: Int?,
+    quickLauncherEnabled: Boolean,
+    onQuickLauncherEnabledChanged: (Boolean) -> Unit,
     onOpenBehavior: () -> Unit,
     onOpenCosmetic: () -> Unit,
     onManageAssignments: () -> Unit
@@ -1039,6 +1049,21 @@ private fun StarterLauncherShortcutsSettingsScreen(
                     )
                 }
             }
+
+            LauncherShortcutTriggerRow(
+                icon = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ManageSearch,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                },
+                title = stringResource(R.string.quick_launcher_enabled_title),
+                description = stringResource(R.string.quick_launcher_enabled_description),
+                checked = quickLauncherEnabled,
+                onCheckedChange = onQuickLauncherEnabledChanged
+            )
 
             LauncherShortcutTriggerRow(
                 icon = {

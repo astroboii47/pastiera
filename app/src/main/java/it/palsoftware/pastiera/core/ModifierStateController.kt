@@ -360,6 +360,14 @@ class ModifierStateController(
         }
     }
 
+    /** Clears Alt state that must not survive an editor restart, preserving an explicit latch. */
+    fun clearTransientAltState() {
+        altState.pressed = false
+        altState.physicallyPressed = false
+        altState.oneShot = false
+        altState.lastReleaseTime = 0
+    }
+
     /**
      * Clears Ctrl state (latch/one-shot/nav mode flags) and, when requested,
      * resets pressed tracking to avoid leaving Ctrl active after shortcuts.

@@ -220,6 +220,7 @@ class ModifierKeyHandler(
 
     fun resetAltState(state: AltState) {
         state.pressed = false
+        state.physicallyPressed = false
         state.oneShot = false
         state.latchActive = false
         state.lastReleaseTime = 0

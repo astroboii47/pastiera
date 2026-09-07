@@ -255,12 +255,15 @@
     <string name="sym_enable_emoji_picker_page_description">Show the full emoji picker when cycling.</string>
     <string name="emoji_picker_expanded_height_title">Larger emoji picker</string>
     <string name="emoji_picker_expanded_height_description">Use about 1.5x height for the emoji search page; other SYM pages keep their normal height.</string>
+    <string name="emoji_picker_raycast_style_title">Raycast-style emoji picker</string>
+    <string name="emoji_picker_raycast_style_description">Use larger glass tiles, top search, and a category menu. Turn off to use the classic picker.</string>
     <string name="emoji_picker_custom_font_title">Custom emoji font</string>
     <string name="emoji_picker_custom_font_description">Render the emoji picker with an imported local font. Inserted emoji still use normal Unicode text.</string>
     <string name="emoji_picker_custom_font_selected">Using %1$s</string>
     <string name="emoji_picker_custom_font_import">Import font</string>
     <string name="emoji_picker_custom_font_imported">Imported %1$s</string>
     <string name="emoji_picker_custom_font_import_failed">Unable to import emoji font</string>
+    <string name="emoji_picker_custom_font_slots">Saved emoji fonts</string>
     <string name="sym_swap_pages_title">Arrange SYM pages order</string>
     <string name="sym_swap_pages_description">Set the exact cycle order for all SYM pages by dragging each row.</string>
     <string name="sym_order_emoji_first">Emoji first</string>
@@ -388,6 +391,8 @@
     <string name="launcher_shortcuts_configure_description">Tap a key to assign or replace a command. Assigned keys are shared by both trigger modes.</string>
     <string name="launcher_shortcuts_configure_description_with_quick_launcher">Tap a key to assign or replace a command. Quick launcher is currently assigned to %1$s.</string>
     <string name="quick_launcher_default_blocked_hint">New: SYM can open the quick launcher. Pastiera would normally assign it to Space, but Space already has a shortcut. Open the assignments page and choose “Open quick launcher” on any key to try it.</string>
+    <string name="quick_launcher_enabled_title">Enable QuickLauncher</string>
+    <string name="quick_launcher_enabled_description">Allow QuickLauncher to open from SYM shortcuts, assigned keys, app shortcuts, and external triggers.</string>
     
     <!-- Launcher Shortcuts Screen -->
     <string name="launcher_shortcuts_screen_title">Pastiera-QuickLauncher</string>
@@ -586,11 +591,12 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="emoji_category_objects">Objects</string>
     <string name="emoji_category_symbols">Symbols</string>
     <string name="emoji_category_flags">Flags</string>
-    <string name="emoji_category_recents">Recents</string>
+    <string name="emoji_category_recents">Frequently Used</string>
     <string name="emoji_category_emoticons">Emoticons</string>
     <string name="emoji_picker_error">Unable to load emoji</string>
     <string name="emoji_picker_search_label">Search</string>
-    <string name="emoji_picker_search_placeholder">Search emoji...</string>
+    <string name="emoji_picker_search_placeholder">Search emoji &amp; symbols...</string>
+    <string name="emoji_picker_all_categories">All Categories</string>
     <string name="emoji_picker_no_results">No emoji found</string>
     
     <!-- Variation Customization -->

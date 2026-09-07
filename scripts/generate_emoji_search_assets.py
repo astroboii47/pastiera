@@ -16,6 +16,26 @@ from pathlib import Path
 
 CLDR_BASE = "https://raw.githubusercontent.com/unicode-org/cldr-json/main/cldr-json/cldr-annotations-full/annotations"
 
+MANUAL_ENGLISH_FALLBACKS = {
+    "🫱‍🫲": ("handshake", ["handshake", "hands", "agreement"]),
+    "🧑‍🐰‍🧑": ("people with bunny ears", ["bunny", "ears", "people"]),
+    "👨‍🐰‍👨": ("men with bunny ears", ["bunny", "ears", "men"]),
+    "👩‍🐰‍👩": ("women with bunny ears", ["bunny", "ears", "women"]),
+    "🧑‍🫯‍🧑": ("people with fight cloud", ["fight", "cloud", "people"]),
+    "👨‍🫯‍👨": ("men with fight cloud", ["fight", "cloud", "men"]),
+    "👩‍🫯‍👩": ("women with fight cloud", ["fight", "cloud", "women"]),
+    "👩‍🤝‍👩": ("women holding hands", ["hands", "holding", "women"]),
+    "👩‍🤝‍👨": ("woman and man holding hands", ["hands", "holding", "woman", "man"]),
+    "👨‍🤝‍👨": ("men holding hands", ["hands", "holding", "men"]),
+    "🧑‍❤️‍💋‍🧑": ("kiss", ["couple", "kiss", "people"]),
+    "🧑‍❤️‍🧑": ("couple with heart", ["couple", "heart", "people"]),
+}
+
+
+def emoji_lookup_key(emoji: str) -> str:
+    """Match CLDR text/emoji presentation variants to the picker entry."""
+    return emoji.replace("\ufe0e", "").replace("\ufe0f", "")
+
 
 def repo_root_from_script() -> Path:
     return Path(__file__).resolve().parents[1]
@@ -35,6 +55,30 @@ def load_project_emojis(emoji_assets_dir: Path) -> set[str]:
     return emojis
 
 
+def emoji_from_unified(value: str) -> str:
+    return "".join(chr(int(codepoint, 16)) for codepoint in value.split("-"))
+
+
+def load_english_fallbacks(emoji_json_path: Path) -> dict[str, tuple[str, list[str]]]:
+    """Use the bundled catalog when CLDR has no annotation for a picker emoji."""
+    catalog = json.loads(emoji_json_path.read_text(encoding="utf-8"))
+    fallbacks: dict[str, tuple[str, list[str]]] = {}
+    for item in catalog:
+        unified = item.get("unified")
+        name = item.get("name")
+        if not isinstance(unified, str) or not isinstance(name, str):
+            continue
+        emoji = emoji_from_unified(unified)
+        readable_name = normalize_field(name.lower())
+        aliases = [readable_name]
+        for alias in item.get("short_names") or []:
+            aliases.append(normalize_field(str(alias).replace("_", " ")))
+        fallbacks[emoji_lookup_key(emoji)] = (readable_name, list(dict.fromkeys(aliases)))
+    for emoji, fallback in MANUAL_ENGLISH_FALLBACKS.items():
+        fallbacks[emoji_lookup_key(emoji)] = fallback
+    return fallbacks
+
+
 def fetch_cldr_annotations(locale: str) -> dict[str, dict]:
     url = f"{CLDR_BASE}/{locale}/annotations.json"
     with urllib.request.urlopen(url) as response:
@@ -46,11 +90,17 @@ def normalize_field(value: str) -> str:
     return " ".join(value.replace("\t", " ").replace("\n", " ").split())
 
 
-def build_rows(locale: str, allowed_emojis: set[str]) -> list[tuple[str, str, list[str]]]:
+def build_rows(
+    locale: str,
+    allowed_emojis: set[str],
+    english_fallbacks: dict[str, tuple[str, list[str]]],
+) -> list[tuple[str, str, list[str]]]:
     raw = fetch_cldr_annotations(locale)
+    allowed_by_key = {emoji_lookup_key(emoji): emoji for emoji in allowed_emojis}
     rows: list[tuple[str, str, list[str]]] = []
     for emoji, payload in raw.items():
-        if emoji not in allowed_emojis:
+        output_emoji = allowed_by_key.get(emoji_lookup_key(emoji))
+        if output_emoji is None:
             continue
         if not isinstance(payload, dict):
             continue
@@ -75,7 +125,17 @@ def build_rows(locale: str, allowed_emojis: set[str]) -> list[tuple[str, str, li
 
         if not name and not keywords:
             continue
-        rows.append((emoji, name, keywords))
+        rows.append((output_emoji, name, keywords))
+
+    if locale == "en":
+        present = {emoji_lookup_key(emoji) for emoji, _, _ in rows}
+        for emoji in allowed_emojis:
+            lookup_key = emoji_lookup_key(emoji)
+            fallback = english_fallbacks.get(lookup_key)
+            if lookup_key in present or fallback is None:
+                continue
+            name, keywords = fallback
+            rows.append((emoji, name, keywords))
 
     rows.sort(key=lambda row: row[0])
     return rows
@@ -102,15 +162,17 @@ def main() -> int:
 
     root = repo_root_from_script()
     emoji_assets_dir = root / "app" / "src" / "main" / "assets" / "common" / "emoji"
+    emoji_json_path = root / "app" / "src" / "main" / "assets" / "emoji.json"
     out_dir = root / "app" / "src" / "main" / "assets" / "common" / "emoji_search"
 
     allowed_emojis = load_project_emojis(emoji_assets_dir)
     if not allowed_emojis:
         print("No project emoji assets found", file=sys.stderr)
         return 1
+    english_fallbacks = load_english_fallbacks(emoji_json_path)
 
     for locale in args.locales:
-        rows = build_rows(locale, allowed_emojis)
+        rows = build_rows(locale, allowed_emojis, english_fallbacks)
         out_path = out_dir / f"{locale}.tsv"
         write_tsv(out_path, rows)
         print(f"Wrote {out_path} ({len(rows)} rows)")

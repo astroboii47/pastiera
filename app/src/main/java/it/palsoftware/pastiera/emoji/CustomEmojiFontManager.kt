@@ -1,9 +1,11 @@
 package it.palsoftware.pastiera.emoji
 
 import android.content.Context
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.TypedValue
 import android.util.Log
 import android.widget.TextView
 import it.palsoftware.pastiera.SettingsManager
@@ -13,6 +15,12 @@ object CustomEmojiFontManager {
     private const val TAG = "CustomEmojiFont"
     private const val DIR_NAME = "custom_emoji_font"
     private const val FONT_FILE_NAME = "emoji-font.ttf"
+    private const val SLOTS_DIR_NAME = "slots"
+
+    data class EmojiFontSlot(
+        val displayName: String,
+        val path: String
+    )
 
     @Volatile
     private var cachedPath: String? = null
@@ -22,9 +30,10 @@ object CustomEmojiFontManager {
 
     fun importFont(context: Context, uri: Uri): String {
         val appContext = context.applicationContext
+        migrateLegacyFontToAppleSlot(appContext)
         val displayName = resolveDisplayName(appContext, uri)
-        val outDir = File(appContext.filesDir, DIR_NAME).apply { mkdirs() }
-        val outFile = File(outDir, FONT_FILE_NAME)
+        val outDir = File(File(appContext.filesDir, DIR_NAME), SLOTS_DIR_NAME).apply { mkdirs() }
+        val outFile = File(outDir, "${slotFileName(displayName)}.ttf")
 
         appContext.contentResolver.openInputStream(uri).use { input ->
             requireNotNull(input) { "Unable to open selected font" }
@@ -39,6 +48,27 @@ object CustomEmojiFontManager {
         cachedTypeface = null
         SettingsManager.setEmojiPickerCustomFont(appContext, outFile.absolutePath, displayName)
         return displayName
+    }
+
+    fun getFontSlots(context: Context): List<EmojiFontSlot> {
+        val appContext = context.applicationContext
+        migrateLegacyFontToAppleSlot(appContext)
+        val slotsDir = File(File(appContext.filesDir, DIR_NAME), SLOTS_DIR_NAME)
+        return slotsDir.listFiles()
+            .orEmpty()
+            .filter { it.isFile && it.extension.equals("ttf", ignoreCase = true) }
+            .sortedWith(compareBy<File> { it.name != "apple-emoji.ttf" }.thenBy { it.name })
+            .map { file ->
+                EmojiFontSlot(
+                    displayName = if (file.name == "apple-emoji.ttf") "Apple Emoji" else displayNameForSlot(file),
+                    path = file.absolutePath
+                )
+            }
+    }
+
+    fun selectFontSlot(context: Context, slot: EmojiFontSlot) {
+        SettingsManager.setEmojiPickerCustomFont(context.applicationContext, slot.path, slot.displayName)
+        clearCache()
     }
 
     fun getTypeface(context: Context): Typeface? {
@@ -72,7 +102,7 @@ object CustomEmojiFontManager {
         customTextSizeSp: Float
     ) {
         val typeface = getTypeface(context)
-        val displayText = displayTextForCustomTypeface(emoji)
+        val displayText = typeface?.let { displayTextForCustomTypeface(emoji, it) }
         if (typeface != null && displayText != null) {
             textView.text = displayText
             textView.typeface = typeface
@@ -81,6 +111,20 @@ object CustomEmojiFontManager {
             textView.text = emoji
             textView.typeface = fallbackTypeface
             textView.textSize = systemTextSizeSp
+            fitFallbackEmojiToTile(textView, emoji, systemTextSizeSp)
+        }
+    }
+
+    private fun fitFallbackEmojiToTile(textView: TextView, emoji: String, textSizeSp: Float) {
+        if (emoji.indexOf('\u200D') < 0) return
+        textView.post {
+            if (textView.text.toString() != emoji) return@post
+            val availableWidth = textView.width - textView.paddingLeft - textView.paddingRight
+            if (availableWidth <= 0) return@post
+            val renderedWidth = textView.paint.measureText(emoji)
+            if (renderedWidth <= availableWidth) return@post
+            val scaledSize = (textSizeSp * availableWidth / renderedWidth).coerceAtLeast(20f)
+            textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, scaledSize)
         }
     }
 
@@ -89,11 +133,15 @@ object CustomEmojiFontManager {
      * inside Android TextView. Let Android handle those sequences instead.
      */
     fun canUseCustomTypeface(emoji: String): Boolean {
-        return displayTextForCustomTypeface(emoji) != null
+        return !emoji.contains('\u200D')
     }
 
-    private fun displayTextForCustomTypeface(emoji: String): String? {
-        if (emoji.indexOf('\u200D') >= 0) return null // ZWJ sequences
+    private fun displayTextForCustomTypeface(emoji: String, typeface: Typeface): String? {
+        if (emoji.indexOf('\u200D') >= 0) {
+            // Complex people/family emoji are single ligature glyphs only in fonts that support them.
+            // Do not force a custom font when it lacks the complete sequence.
+            return emoji.takeIf { Paint().apply { this.typeface = typeface }.hasGlyph(it) }
+        }
         val normalized = emoji
             .replace("\uFE0E", "")
             .replace("\uFE0F", "")
@@ -121,5 +169,31 @@ object CustomEmojiFontManager {
             }
         }
         return uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: "Custom emoji font"
+    }
+
+    private fun migrateLegacyFontToAppleSlot(context: Context) {
+        val currentPath = SettingsManager.getEmojiPickerCustomFontPath(context)
+        val legacyFile = File(currentPath)
+        if (legacyFile.name != FONT_FILE_NAME || !legacyFile.isFile) return
+
+        val slotsDir = File(File(context.filesDir, DIR_NAME), SLOTS_DIR_NAME).apply { mkdirs() }
+        val appleSlot = File(slotsDir, "apple-emoji.ttf")
+        if (!appleSlot.exists()) legacyFile.copyTo(appleSlot)
+        SettingsManager.setEmojiPickerCustomFont(context, appleSlot.absolutePath, "Apple Emoji")
+        clearCache()
+    }
+
+    private fun slotFileName(displayName: String): String {
+        val sanitized = displayName.substringBeforeLast('.')
+            .lowercase()
+            .replace(Regex("[^a-z0-9]+"), "-")
+            .trim('-')
+        return sanitized.ifBlank { "custom-emoji-font" }
+    }
+
+    private fun displayNameForSlot(file: File): String {
+        return file.nameWithoutExtension
+            .replace('-', ' ')
+            .replaceFirstChar { it.titlecase() }
     }
 }

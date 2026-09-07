@@ -1,8 +1,13 @@
 package it.palsoftware.pastiera.inputmethod.ui
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
+import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.ColorDrawable
@@ -29,6 +34,7 @@ import android.widget.ProgressBar
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.PopupWindow
+import android.widget.ScrollView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ListAdapter
@@ -74,7 +80,13 @@ class EmojiPickerView(
     private val vertical: LinearLayout
     private val keyboardSwitcherButton: ImageView
     private val contentFrame: FrameLayout
+    private val frostedBackgroundView: FrostedBackgroundView
     private val searchPanel: FrameLayout
+    private val topFadeView: View
+    private val searchBackButton: ImageView
+    private val categoryLabel: TextView
+    private val bottomHintLeft: TextView
+    private val bottomHintRight: TextView
     private val searchToggleButton: ImageView
     private val closeButton: ImageView
 
@@ -83,8 +95,9 @@ class EmojiPickerView(
 
     private val compactHeight = dpToPx(220f)
     private val expandedHeight = dpToPx(340f)
-    private val emojiSize = dpToPx(48f)
-    private val spacing = dpToPx(4f)
+    private val raycastStyle = SettingsManager.getEmojiPickerRaycastStyle(context)
+    private val emojiSize = dpToPx(if (raycastStyle) 64f else 48f)
+    private val spacing = dpToPx(if (raycastStyle) 8f else 4f)
     private val smallPadding = dpToPx(8f)
     private val recentsApplyTopThreshold = 0
 
@@ -98,6 +111,7 @@ class EmojiPickerView(
     private var pendingRecentsRefreshRequiresTop = false
     private var pendingRecentsRefreshRequiresNotRecents = false
     private var scrollState = RecyclerView.SCROLL_STATE_IDLE
+    private var topFadeVisible = false
 
     // Adapter
     private val sectionAdapter: SectionAdapter
@@ -108,7 +122,10 @@ class EmojiPickerView(
     private var searchQuery: String = ""
     private var searchJob: Job? = null
     private var isSearchMode: Boolean = false
-    private var isSearchPanelVisible: Boolean = false
+    private var selectedSearchPosition: Int = 0
+    private var selectedSectionPosition: Int = RecyclerView.NO_POSITION
+    private var categoryPopup: PopupWindow? = null
+    private var isSearchPanelVisible: Boolean = raycastStyle
     private var searchInputCaptureEnabled: Boolean = true
     private var pendingSearchReplacementRange: IntRange? = null
     private var tabCategoryIds: List<String> = emptyList()
@@ -117,6 +134,7 @@ class EmojiPickerView(
     private var wechatEmojiItems: List<WechatEmojiItem> = emptyList()
     private var gifPickerView: GifPickerView? = null
     private var customEmojiTypeface = CustomEmojiFontManager.getTypeface(context)
+    private val emojiAccentCache = mutableMapOf<String, Int?>()
     private var isMediaMode: Boolean = false
     private var lastSoftwareKeyboardHeightPx: Int? = null
     var themeOverride: KeyboardThemeColors? = null
@@ -135,7 +153,9 @@ class EmojiPickerView(
         // Calculate columns based on screen width
         val screenWidth = context.resources.displayMetrics.widthPixels
         val availableWidth = screenWidth - smallPadding * 2
-        columns = ((availableWidth + spacing) / (emojiSize + spacing)).coerceAtLeast(4).coerceAtMost(10)
+        columns = ((availableWidth + spacing) / (emojiSize + spacing))
+            .coerceAtLeast(4)
+            .coerceAtMost(if (raycastStyle) 7 else 10)
 
         // Layout container: vertical stack (recycler + bottom tabs)
         vertical = LinearLayout(context).apply {
@@ -145,19 +165,17 @@ class EmojiPickerView(
 
         searchField = EditText(context).apply {
             hint = context.getString(R.string.emoji_picker_search_placeholder)
-            textSize = 14f
+            textSize = if (raycastStyle) 22f else 14f
             setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT
-            background = createSearchFieldBackground()
-            val padH = dpToPx(8f)
-            val padV = dpToPx(5f)
+            background = if (raycastStyle) ColorDrawable(Color.TRANSPARENT) else createSearchFieldBackground()
+            val padH = dpToPx(if (raycastStyle) 6f else 8f)
+            val padV = dpToPx(if (raycastStyle) 10f else 5f)
             setPadding(padH, padV, padH, padV)
             layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
                 ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(smallPadding, smallPadding, smallPadding, 0)
-            }
+            )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 showSoftInputOnFocus = false
             }
@@ -172,26 +190,78 @@ class EmojiPickerView(
                 }
             })
             setOnClickListener {
-                setSearchInputCaptureEnabled(!searchInputCaptureEnabled)
+                // A search-field tap must always make it the hardware-key target.
+                // Toggling here made a second tap silently turn capture off.
+                setSearchInputCaptureEnabled(true)
             }
         }
         setSearchInputCaptureEnabled(false)
 
-        searchPanel = FrameLayout(context).apply {
-            visibility = View.GONE
-            setBackgroundColor(themeOverride?.background ?: Color.rgb(24, 24, 24))
-            val panelPadding = dpToPx(6f)
-            setPadding(panelPadding, panelPadding, panelPadding, panelPadding)
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
+        searchBackButton = ImageView(context).apply {
+            setImageResource(R.drawable.keyboard_arrow_left_24)
+            contentDescription = context.getString(R.string.close)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            val pad = dpToPx(4f)
+            setPadding(pad, pad, pad, pad)
+            isClickable = true
+            isFocusable = true
+            layoutParams = LinearLayout.LayoutParams(dpToPx(38f), dpToPx(if (raycastStyle) 52f else 40f))
+            setOnClickListener {
+                onCloseRequested?.invoke()
+            }
+        }
+
+        categoryLabel = TextView(context).apply {
+            text = context.getString(R.string.emoji_picker_all_categories)
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setTypeface(null, Typeface.BOLD)
+            includeFontPadding = false
+            setPadding(dpToPx(10f), 0, dpToPx(8f), 0)
+            background = createCategoryChipBackground()
+            val icon = categoryIconDrawable(R.drawable.ic_emoji_symbols_24)
+            setCompoundDrawablesWithIntrinsicBounds(icon, null, categoryIconDrawable(R.drawable.keyboard_arrow_down_24), null)
+            compoundDrawablePadding = dpToPx(6f)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                categoryPopup?.dismiss() ?: showCategoryPopup()
+            }
+            layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM
+                dpToPx(if (raycastStyle) 48f else 40f)
             )
-            addView(searchField, FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM
-            ))
+        }
+
+        searchPanel = FrameLayout(context).apply {
+            visibility = if (raycastStyle) View.VISIBLE else View.GONE
+            background = ColorDrawable(Color.TRANSPARENT)
+            setPadding(dpToPx(8f), dpToPx(8f), dpToPx(10f), 0)
+            if (raycastStyle) {
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                addView(LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(searchBackButton)
+                    addView(searchField, LinearLayout.LayoutParams(0, dpToPx(52f), 1f))
+                    addView(categoryLabel)
+                }, FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER
+                ))
+            } else {
+                addView(searchField, FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER
+                ).apply {
+                    setMargins(smallPadding, 0, smallPadding, smallPadding)
+                })
+            }
         }
 
         closeButton = ImageView(context).apply {
@@ -213,8 +283,16 @@ class EmojiPickerView(
         recyclerView = RecyclerView(context).apply {
             overScrollMode = View.OVER_SCROLL_ALWAYS
             setHasFixedSize(false)
+            // Selection changes only alter tile backgrounds. Animating those changes can
+            // briefly draw the old and new tiles together during rapid keyboard navigation.
+            itemAnimator = null
             clipToPadding = false
-            setPadding(smallPadding, smallPadding, smallPadding, smallPadding + dpToPx(44f))
+            setPadding(
+                smallPadding,
+                if (raycastStyle) dpToPx(56f) else smallPadding,
+                smallPadding,
+                smallPadding + dpToPx(44f)
+            )
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -252,13 +330,20 @@ class EmojiPickerView(
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                 scrollState = newState
+                updateTopFadeVisibility()
                 if (newState == RecyclerView.SCROLL_STATE_IDLE) {
                     isTabClickScroll = false
+                    val lm = recyclerView.layoutManager as? GridLayoutManager
+                    val firstVisible = lm?.findFirstVisibleItemPosition() ?: RecyclerView.NO_POSITION
+                    if (firstVisible != RecyclerView.NO_POSITION) {
+                        updateSelectedTopEmoji(firstVisible)
+                    }
                     maybeApplyPendingRecentsRefresh()
                 }
             }
 
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                updateTopFadeVisibility()
                 if (isSearchMode) return
                 if (isTabClickScroll) return
                 val lm = recyclerView.layoutManager as? GridLayoutManager ?: return
@@ -297,7 +382,7 @@ class EmojiPickerView(
         searchToggleButton = ImageView(context).apply {
             setImageResource(R.drawable.ic_search_24)
             contentDescription = context.getString(R.string.emoji_picker_search_label)
-            background = createTabBackground(false)
+            background = createTabBackground(true)
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             val pad = dpToPx(4f)
             setPadding(pad, pad, pad, pad)
@@ -308,7 +393,7 @@ class EmojiPickerView(
             }
             setOnClickListener {
                 setMediaMode(false)
-                setSearchPanelVisible(!isSearchPanelVisible)
+                setSearchPanelVisible(true)
             }
         }
         tabRow = LinearLayout(context).apply {
@@ -342,29 +427,105 @@ class EmojiPickerView(
             }
         }
 
+        frostedBackgroundView = FrostedBackgroundView(context).apply {
+            visibility = if (raycastStyle) View.VISIBLE else View.GONE
+        }
+
         contentFrame = FrameLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 0,
                 1f
             )
-            addView(recyclerView)
-            addView(searchPanel)
+            addView(frostedBackgroundView, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            ))
+            addView(recyclerView, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            ).apply {
+                // Keep the viewport full-height. Top padding positions the initial
+                // content, while clipToPadding=false lets it glide behind the
+                // pinned header and fade smoothly during scrolling.
+                topMargin = 0
+            })
+        }
+        topFadeView = View(context).apply {
+            background = createTopFadeBackground()
+            isClickable = false
+            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+            visibility = View.GONE
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dpToPx(122f),
+                Gravity.TOP
+            )
+        }
+        (topFadeView.layoutParams as? FrameLayout.LayoutParams)?.topMargin = 0
+        contentFrame.addView(topFadeView)
+        if (raycastStyle) {
+            contentFrame.addView(searchPanel, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP
+            ))
+        }
+        bottomHintLeft = TextView(context).apply {
+            text = context.getString(R.string.emoji_picker_search_placeholder)
+            textSize = 12.5f
+            setTypeface(null, Typeface.BOLD)
+            includeFontPadding = false
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dpToPx(12f), 0, dpToPx(12f), 0)
+            background = createHintPillBackground()
+            visibility = if (raycastStyle) View.VISIBLE else View.GONE
+        }
+        bottomHintRight = TextView(context).apply {
+            text = "Paste"
+            textSize = 13f
+            setTypeface(null, Typeface.BOLD)
+            includeFontPadding = false
+            gravity = Gravity.CENTER
+            setPadding(dpToPx(14f), 0, dpToPx(14f), 0)
+            background = createHintPillBackground()
+            setCompoundDrawablesWithIntrinsicBounds(null, null, categoryIconDrawable(R.drawable.keyboard_return_24), null)
+            compoundDrawablePadding = dpToPx(8f)
+            visibility = if (raycastStyle) View.VISIBLE else View.GONE
+        }
+        contentFrame.addView(bottomHintLeft, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            dpToPx(36f),
+            Gravity.BOTTOM or Gravity.START
+        ).apply { setMargins(dpToPx(8f), 0, 0, dpToPx(8f)) })
+        contentFrame.addView(bottomHintRight, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            dpToPx(36f),
+            Gravity.BOTTOM or Gravity.END
+        ).apply { setMargins(0, 0, dpToPx(8f), dpToPx(8f)) })
+        if (!raycastStyle) {
+            contentFrame.addView(searchPanel, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM
+            ))
         }
         vertical.addView(contentFrame)
-        vertical.addView(
-            LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    tabHeight
-                )
-                addView(searchToggleButton)
-                addView(keyboardSwitcherButton)
-                addView(tabScrollView, LinearLayout.LayoutParams(0, tabHeight, 1f))
-                addView(closeButton)
-            }
-        )
+        if (!raycastStyle) {
+            vertical.addView(
+                LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        tabHeight
+                    )
+                    addView(searchToggleButton)
+                    addView(keyboardSwitcherButton)
+                    addView(tabScrollView, LinearLayout.LayoutParams(0, tabHeight, 1f))
+                    addView(closeButton)
+                }
+            )
+        }
 
         addView(vertical)
         addView(loadingView)
@@ -376,11 +537,23 @@ class EmojiPickerView(
         )
 
         applyTheme()
+        setSearchInputCaptureEnabled(raycastStyle)
+        if (raycastStyle) {
+            post { focusSearchField() }
+        }
         loadCategories()
     }
 
     fun setInputConnection(connection: InputConnection?) {
         currentInputConnection = connection
+    }
+
+    fun activateSearchOnOpen() {
+        if (!raycastStyle || isMediaMode) return
+        isSearchPanelVisible = true
+        searchPanel.visibility = View.VISIBLE
+        setSearchInputCaptureEnabled(true)
+        post { focusSearchField() }
     }
 
     fun showMediaTab() {
@@ -489,6 +662,10 @@ class EmojiPickerView(
         focusSearchField()
 
         return when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> moveEmojiSelection(-1)
+            KeyEvent.KEYCODE_DPAD_RIGHT -> moveEmojiSelection(1)
+            KeyEvent.KEYCODE_DPAD_UP -> moveEmojiSelection(-columns)
+            KeyEvent.KEYCODE_DPAD_DOWN -> moveEmojiSelection(columns)
             KeyEvent.KEYCODE_DEL -> {
                 val text = searchField.text ?: return true
                 if (text.isEmpty()) return true
@@ -510,7 +687,10 @@ class EmojiPickerView(
                 true
             }
             KeyEvent.KEYCODE_ENTER,
-            KeyEvent.KEYCODE_NUMPAD_ENTER -> true
+            KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                insertCurrentSelection()
+                true
+            }
             else -> {
                 val typedText = resolveTypedText?.invoke(event) ?: run {
                     val unicode = event.unicodeChar
@@ -543,7 +723,11 @@ class EmojiPickerView(
             KeyEvent.KEYCODE_DEL,
             KeyEvent.KEYCODE_SPACE,
             KeyEvent.KEYCODE_ENTER,
-            KeyEvent.KEYCODE_NUMPAD_ENTER -> true
+            KeyEvent.KEYCODE_NUMPAD_ENTER,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN -> true
             else -> {
                 val unicode = event.unicodeChar
                 unicode > 0 && !Character.isISOControl(unicode.toChar())
@@ -840,10 +1024,13 @@ class EmojiPickerView(
             recyclerView.visibility = View.GONE
             loadingView.visibility = View.GONE
             emptyView.visibility = View.GONE
+            bottomHintLeft.visibility = View.GONE
+            bottomHintRight.visibility = View.GONE
             val mediaView = gifPickerView ?: GifPickerView(
                 context = context,
                 gifClient = KlipyGifClient(context),
                 onGifSelected = { result -> onGifSelected?.invoke(result) },
+                onExitRequested = { setMediaMode(false) },
                 fillParentHeight = true
             ).also { gifPickerView = it }
             if (mediaView.parent !== contentFrame) {
@@ -863,7 +1050,11 @@ class EmojiPickerView(
             }
         } else {
             gifPickerView?.visibility = View.GONE
-            searchPanel.visibility = if (isSearchPanelVisible) View.VISIBLE else View.GONE
+            isSearchPanelVisible = raycastStyle
+            searchPanel.visibility = if (raycastStyle) View.VISIBLE else View.GONE
+            searchToggleButton.background = createTabBackground(true)
+            bottomHintLeft.visibility = if (raycastStyle) View.VISIBLE else View.GONE
+            bottomHintRight.visibility = if (raycastStyle) View.VISIBLE else View.GONE
             if (isSearchMode) {
                 val hasResults = searchAdapter.itemCount > 0
                 recyclerView.visibility = if (hasResults) View.VISIBLE else View.GONE
@@ -874,7 +1065,10 @@ class EmojiPickerView(
                 recyclerView.visibility = if (sectionAdapter.itemCount > 0) View.VISIBLE else View.GONE
             }
             recyclerView.bringToFront()
+            topFadeView.bringToFront()
             searchPanel.bringToFront()
+            bottomHintLeft.bringToFront()
+            bottomHintRight.bringToFront()
         }
         updateTabsSelection()
     }
@@ -900,7 +1094,25 @@ class EmojiPickerView(
 
         val results = EmojiSearchRepository.search(index, query)
         setSearchMode(true)
-        searchAdapter.submitList(results)
+        selectedSearchPosition = 0
+        searchAdapter.submitList(results) {
+            updateBottomHints()
+            if (results.isNotEmpty()) {
+                // ListAdapter applies diffs asynchronously. Reset only after the new
+                // result list is attached, otherwise a stale scroll offset can leave
+                // the first result hidden beneath the pinned search header.
+                (recyclerView.layoutManager as? GridLayoutManager)
+                    ?.scrollToPositionWithOffset(searchAdapter.firstEmojiAdapterPosition, recyclerView.paddingTop)
+                // The search header occupies adapter position zero in Raycast mode.
+                // Rebind after the async diff: unchanged results can otherwise retain
+                // the accent background from the previous search selection.
+                recyclerView.post {
+                    if (isSearchMode && selectedSearchPosition == 0 && searchAdapter.itemCount > searchAdapter.firstEmojiAdapterPosition) {
+                        searchAdapter.notifyDataSetChanged()
+                    }
+                }
+            }
+        }
         if (results.isEmpty()) {
             emptyView.text = context.getString(R.string.emoji_picker_no_results)
             emptyView.visibility = View.VISIBLE
@@ -908,7 +1120,6 @@ class EmojiPickerView(
         } else {
             emptyView.visibility = View.GONE
             recyclerView.visibility = View.VISIBLE
-            recyclerView.scrollToPosition(0)
         }
     }
 
@@ -932,10 +1143,20 @@ class EmojiPickerView(
         if (enabled) {
             recyclerView.adapter = searchAdapter
             lm.spanSizeLookup = searchAdapter.spanSizeLookup
+            selectedSearchPosition = 0
+            selectedSectionPosition = RecyclerView.NO_POSITION
         } else {
             recyclerView.adapter = sectionAdapter
             lm.spanSizeLookup = sectionAdapter.spanSizeLookup
+            selectedSectionPosition = firstEmojiPosition()
             updateTabsSelection()
+            // Search and section cells share the same RecyclerView. Rebind after the
+            // adapter switch so a recycled search selection cannot retain its accent.
+            recyclerView.post {
+                if (!isSearchMode && recyclerView.adapter === sectionAdapter) {
+                    sectionAdapter.notifyDataSetChanged()
+                }
+            }
         }
         tabRow.alpha = if (enabled) 0.55f else 1f
     }
@@ -946,7 +1167,7 @@ class EmojiPickerView(
 
         categories.forEach { category ->
             val title = category.displayNameRes?.let { context.getString(it) } ?: category.id
-            items.add(SectionItem.Header(category.id, title))
+            items.add(SectionItem.Header(category.id, title, category.emojis.size))
             categoryIds.add(category.id)
             category.emojis.forEach { emojiEntry ->
                 items.add(SectionItem.Emoji(category.id, emojiEntry))
@@ -954,7 +1175,7 @@ class EmojiPickerView(
             }
         }
         if (wechatEmojiItems.isNotEmpty()) {
-            items.add(SectionItem.Header(WECHAT_EMOJI_CATEGORY_ID, "WeChat"))
+            items.add(SectionItem.Header(WECHAT_EMOJI_CATEGORY_ID, "WeChat", wechatEmojiItems.size))
             categoryIds.add(WECHAT_EMOJI_CATEGORY_ID)
             wechatEmojiItems.forEach { item ->
                 items.add(SectionItem.WechatEmoji(item))
@@ -963,6 +1184,7 @@ class EmojiPickerView(
         }
 
         rebuildIndexCaches(items, categoryIds)
+        selectedSectionPosition = firstEmojiPosition()
         sectionAdapter.submitList(items)
     }
 
@@ -1084,6 +1306,326 @@ class EmojiPickerView(
         wechatTabView?.background = createTabBackground(!isMediaMode && selectedCategoryId == WECHAT_EMOJI_CATEGORY_ID)
         wechatTabView?.setColorFilter(themeOverride?.textAndIcons ?: Color.WHITE)
         gifTabView?.background = createTabBackground(isMediaMode)
+        updateCategoryChip()
+        updateBottomHints()
+    }
+
+    private fun updateCategoryChip() {
+        if (!raycastStyle) return
+        val selectedHeader = sectionItems
+            .filterIsInstance<SectionItem.Header>()
+            .firstOrNull { it.categoryId == selectedCategoryId }
+        val label = when {
+            isMediaMode -> context.getString(R.string.emoji_picker_gif_tab)
+            selectedHeader != null -> selectedHeader.title
+            else -> context.getString(R.string.emoji_picker_all_categories)
+        }
+        val iconRes = when {
+            isMediaMode -> R.drawable.ic_media_24
+            selectedHeader != null -> categoryIconRes(selectedHeader.categoryId)
+            else -> R.drawable.ic_emoji_symbols_24
+        }
+        categoryLabel.text = label
+        categoryLabel.setCompoundDrawablesWithIntrinsicBounds(
+            categoryIconDrawable(iconRes),
+            null,
+            categoryIconDrawable(R.drawable.keyboard_arrow_down_24),
+            null
+        )
+    }
+
+    private fun updateBottomHints() {
+        if (!raycastStyle) return
+        val selectedName = currentSelectedEmojiName()
+        bottomHintLeft.text = selectedName?.let { "Search Emoji & Symbols - $it" }
+            ?: context.getString(R.string.emoji_picker_search_placeholder)
+        bottomHintRight.text = "Paste"
+        bottomHintRight.setCompoundDrawablesWithIntrinsicBounds(
+            null,
+            null,
+            if (currentSelectedEmoji() != null) categoryIconDrawable(R.drawable.keyboard_return_24) else null,
+            null
+        )
+    }
+
+    private fun currentSelectedEmoji(): String? {
+        return currentSelectedEmojiEntry()?.base
+    }
+
+    private fun currentSelectedEmojiEntry(): EmojiRepository.EmojiEntry? {
+        if (isMediaMode) return null
+        if (isSearchMode) {
+            return searchAdapter.currentList.getOrNull(selectedSearchPosition)?.entry
+        }
+        return (sectionItems.getOrNull(selectedSectionPosition) as? SectionItem.Emoji)?.entry
+            ?: sectionItems.firstNotNullOfOrNull { item ->
+                when (item) {
+                    is SectionItem.Emoji -> item.entry
+                    else -> null
+                }
+            }
+    }
+
+    private fun currentSelectedEmojiName(): String? {
+        val selected = currentSelectedEmojiEntry() ?: return null
+        val rawName = searchIndex?.items
+            ?.firstOrNull { it.entry.base == selected.base }
+            ?.terms
+            ?.firstOrNull { it.kind == EmojiSearchRepository.TermKind.NAME }
+            ?.normalizedText
+            ?: return null
+        return rawName.split(' ').joinToString(" ") { word ->
+            word.replaceFirstChar { char -> char.titlecase() }
+        }
+    }
+
+    private fun firstEmojiPosition(): Int {
+        return sectionItems.indexOfFirst { it is SectionItem.Emoji }
+    }
+
+    private fun updateSelectedTopEmoji(firstVisiblePosition: Int) {
+        if (!raycastStyle || isSearchMode) return
+        val nextSelected = sectionItems
+            .withIndex()
+            .drop(firstVisiblePosition.coerceAtLeast(0))
+            .firstOrNull { (_, item) -> item is SectionItem.Emoji }
+            ?.index
+            ?: firstEmojiPosition()
+        if (nextSelected == selectedSectionPosition) return
+        val previous = selectedSectionPosition
+        selectedSectionPosition = nextSelected
+        val refreshTiles = {
+            if (previous != RecyclerView.NO_POSITION) {
+                sectionAdapter.notifyItemChanged(previous)
+            }
+            if (nextSelected != RecyclerView.NO_POSITION) {
+                sectionAdapter.notifyItemChanged(nextSelected)
+            }
+        }
+        if (recyclerView.isComputingLayout) {
+            recyclerView.post(refreshTiles)
+        } else {
+            refreshTiles()
+        }
+        updateBottomHints()
+    }
+
+    private fun insertCurrentSelection(): Boolean {
+        val item = if (isSearchMode) {
+            searchAdapter.currentList.getOrNull(selectedSearchPosition)
+        } else {
+            null
+        }
+        if (item != null) {
+            onEmojiSelected(item.entry.base, item.categoryId)
+            return true
+        }
+        val sectionItem: SectionItem.Emoji = (sectionItems.getOrNull(selectedSectionPosition) as? SectionItem.Emoji)
+            ?: sectionItems.firstNotNullOfOrNull { candidate ->
+                when (candidate) {
+                    is SectionItem.Emoji -> candidate
+                    else -> null
+                }
+            } ?: return false
+        onEmojiSelected(sectionItem.entry.base, sectionItem.categoryId)
+        return true
+    }
+
+    private fun moveEmojiSelection(delta: Int): Boolean {
+        if (isMediaMode) return false
+        if (isSearchMode) {
+            val count = searchAdapter.currentList.size
+            if (count == 0) return true
+            val previous = selectedSearchPosition
+            selectedSearchPosition = (selectedSearchPosition + delta).coerceIn(0, count - 1)
+            if (previous != selectedSearchPosition) {
+                searchAdapter.notifyItemChanged(searchAdapter.emojiAdapterPosition(previous))
+                searchAdapter.notifyItemChanged(searchAdapter.emojiAdapterPosition(selectedSearchPosition))
+                recyclerView.scrollToPosition(searchAdapter.emojiAdapterPosition(selectedSearchPosition))
+                updateBottomHints()
+            }
+            return true
+        }
+
+        val emojiPositions = sectionItems.indices.filter { sectionItems[it] is SectionItem.Emoji }
+        if (emojiPositions.isEmpty()) return true
+        val nextPosition = if (kotlin.math.abs(delta) == columns) {
+            // Headers span the full grid width. Navigate by grid row and span index so
+            // up/down stays in the current visual column instead of flattening headers.
+            val lookup = sectionAdapter.spanSizeLookup
+            val current = selectedSectionPosition.takeIf { it in sectionItems.indices } ?: emojiPositions.first()
+            val currentGroup = lookup.getSpanGroupIndex(current, columns)
+            val currentColumn = lookup.getSpanIndex(current, columns)
+            val targetGroup = emojiPositions
+                .map { lookup.getSpanGroupIndex(it, columns) }
+                .distinct()
+                .let { groups ->
+                    if (delta > 0) groups.filter { it > currentGroup }.minOrNull()
+                    else groups.filter { it < currentGroup }.maxOrNull()
+                }
+            emojiPositions
+                .filter { targetGroup != null && lookup.getSpanGroupIndex(it, columns) == targetGroup }
+                .minByOrNull { kotlin.math.abs(lookup.getSpanIndex(it, columns) - currentColumn) }
+                ?: current
+        } else {
+            val currentIndex = emojiPositions.indexOf(selectedSectionPosition).let { if (it >= 0) it else 0 }
+            emojiPositions[(currentIndex + delta).coerceIn(0, emojiPositions.lastIndex)]
+        }
+        if (nextPosition != selectedSectionPosition) {
+            val previous = selectedSectionPosition
+            selectedSectionPosition = nextPosition
+            if (previous != RecyclerView.NO_POSITION) sectionAdapter.notifyItemChanged(previous)
+            sectionAdapter.notifyItemChanged(nextPosition)
+            recyclerView.scrollToPosition(nextPosition)
+            updateBottomHints()
+        }
+        return true
+    }
+
+    private fun showCategoryPopup() {
+        if (categoryPopup?.isShowing == true) {
+            categoryPopup?.dismiss()
+            return
+        }
+        val headers = sectionItems.filterIsInstance<SectionItem.Header>()
+        if (headers.isEmpty() && onGifSelected == null) return
+        val theme = themeOverride
+        val popupWidth = minOf(context.resources.displayMetrics.widthPixels - dpToPx(24f), dpToPx(280f))
+        val popupMaxHeight = dpToPx(260f)
+        val rowHeight = dpToPx(46f)
+        var popup: PopupWindow? = null
+
+        val list = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(8f), dpToPx(8f), dpToPx(8f), dpToPx(8f))
+            background = createCategoryPopupBackground()
+        }
+
+        fun addRow(label: String, count: Int?, iconRes: Int, selected: Boolean, onClick: () -> Unit) {
+            val row = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dpToPx(12f), 0, dpToPx(12f), 0)
+                background = createCategoryPopupRowBackground(selected)
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    rowHeight
+                ).apply {
+                    setMargins(0, dpToPx(2f), 0, dpToPx(2f))
+                }
+                setOnClickListener {
+                    popup?.dismiss()
+                    // Let the popup release its window/focus before changing the
+                    // recycler underneath it. This keeps the IME picker open.
+                    this@EmojiPickerView.post(onClick)
+                }
+            }
+            row.addView(ImageView(context).apply {
+                setImageResource(iconRes)
+                setColorFilter(theme?.textAndIcons ?: Color.WHITE)
+                layoutParams = LinearLayout.LayoutParams(dpToPx(24f), dpToPx(24f)).apply {
+                    marginEnd = dpToPx(12f)
+                }
+            })
+            row.addView(TextView(context).apply {
+                text = label
+                textSize = 16f
+                setTypeface(null, Typeface.BOLD)
+                gravity = Gravity.CENTER_VERTICAL
+                setTextColor(theme?.textAndIcons ?: Color.WHITE)
+                includeFontPadding = false
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            })
+            if (count != null) {
+                row.addView(TextView(context).apply {
+                    text = count.toString()
+                    textSize = 13f
+                    setTypeface(null, Typeface.BOLD)
+                    gravity = Gravity.CENTER_VERTICAL
+                    setTextColor(colorWithAlpha(theme?.textAndIcons ?: Color.WHITE, 145))
+                    includeFontPadding = false
+                })
+            }
+            list.addView(row)
+        }
+
+        addRow(
+            context.getString(R.string.emoji_picker_all_categories),
+            headers.sumOf { it.count },
+            R.drawable.ic_emoji_symbols_24,
+            !isMediaMode && selectedCategoryId == null
+        ) {
+            setMediaMode(false)
+            val firstCategory = headers.firstOrNull()?.categoryId ?: return@addRow
+            jumpToCategory(firstCategory)
+        }
+        headers.forEach { header ->
+            addRow(header.title, header.count, categoryIconRes(header.categoryId), !isMediaMode && selectedCategoryId == header.categoryId) {
+                setMediaMode(false)
+                jumpToCategory(header.categoryId)
+            }
+        }
+        if (onGifSelected != null) {
+            addRow(context.getString(R.string.emoji_picker_gif_tab), null, R.drawable.ic_media_24, isMediaMode) {
+                setMediaMode(true)
+            }
+        }
+
+        val scrollView = ScrollView(context).apply {
+            isVerticalScrollBarEnabled = false
+            background = createCategoryPopupBackground()
+            clipToOutline = true
+            addView(list)
+        }
+        list.background = null
+        list.measure(
+            MeasureSpec.makeMeasureSpec(popupWidth, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+        )
+        val popupHeight = minOf(popupMaxHeight, list.measuredHeight)
+        popup = PopupWindow(
+            scrollView,
+            popupWidth,
+            popupHeight,
+            false
+        ).apply {
+            isTouchable = true
+            inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
+            isOutsideTouchable = false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                isTouchModal = false
+            }
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            elevation = dpToPx(8f).toFloat()
+        }
+        if (categoryLabel.isAttachedToWindow) {
+            popup.showAsDropDown(categoryLabel, 0, dpToPx(6f), Gravity.END)
+        }
+        categoryPopup = popup
+        popup.setOnDismissListener { categoryPopup = null }
+    }
+
+    private fun jumpToCategory(categoryId: String) {
+        if (isSearchMode) {
+            searchField.text?.clear()
+            setSearchMode(false)
+        }
+        selectedCategoryId = categoryId
+        updateTabsSelection()
+        isTabClickScroll = true
+        val headerPos = headerPositions[categoryId] ?: return
+        selectedSectionPosition = sectionItems
+            .withIndex()
+            .drop(headerPos)
+            .firstOrNull { (_, item) -> item is SectionItem.Emoji }
+            ?.index
+            ?: RecyclerView.NO_POSITION
+        (recyclerView.layoutManager as? GridLayoutManager)?.scrollToPositionWithOffset(headerPos, 0)
+        recyclerView.post {
+            if (categoryId == EmojiRepository.RECENTS_CATEGORY_ID) {
+                requestRecentsRefresh(requireTop = true, requireNotRecents = false)
+            }
+        }
     }
 
     private fun onEmojiSelected(emoji: String, categoryId: String) {
@@ -1098,6 +1640,10 @@ class EmojiPickerView(
             }
         } else {
             inputConnection?.commitText(emoji, 1)
+        }
+        if (isSearchMode || searchField.text?.isNotEmpty() == true) {
+            searchField.text?.clear()
+            selectedSearchPosition = 0
         }
         // Save to storage and refresh recents when safe for UX.
         val requiresNotRecents = categoryId == EmojiRepository.RECENTS_CATEGORY_ID
@@ -1267,6 +1813,93 @@ class EmojiPickerView(
         }
     }
 
+    private fun createEmojiTileBackground(): GradientDrawable {
+        val theme = themeOverride
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            orientation = GradientDrawable.Orientation.TOP_BOTTOM
+            val baseColor = blendColors(theme?.normalKey ?: Color.rgb(74, 70, 70), Color.WHITE, 0.16f)
+            colors = intArrayOf(
+                colorWithAlpha(baseColor, if (raycastStyle) 118 else 48),
+                colorWithAlpha(blendColors(baseColor, Color.BLACK, 0.10f), if (raycastStyle) 92 else 24)
+            )
+            if (theme != null && !raycastStyle) {
+                setStroke(dpToPx(1f), colorWithAlpha(Color.WHITE, 36))
+            } else if (raycastStyle) {
+                setStroke(dpToPx(1f), colorWithAlpha(Color.WHITE, 34))
+            }
+            cornerRadius = dpToPx(if (raycastStyle) 14f else 14f).toFloat()
+        }
+    }
+
+    private fun createSelectedEmojiTileBackground(emoji: String? = null): GradientDrawable {
+        val accent = dominantEmojiAccentColor(emoji) ?: emojiAccentColor(emoji) ?: themeOverride?.keyTap ?: Color.argb(255, 255, 193, 7)
+        val warmAccent = blendColors(accent, Color.rgb(255, 222, 157), 0.32f)
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            orientation = GradientDrawable.Orientation.TOP_BOTTOM
+            colors = intArrayOf(
+                colorWithAlpha(warmAccent, 132),
+                colorWithAlpha(accent, 78)
+            )
+            setStroke(dpToPx(2f), colorWithAlpha(Color.rgb(255, 232, 181), 235))
+            cornerRadius = dpToPx(12f).toFloat()
+        }
+    }
+
+    private fun createCategoryChipBackground(): GradientDrawable {
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(colorWithAlpha(themeOverride?.normalKey ?: Color.WHITE, 78))
+            setStroke(dpToPx(1f), colorWithAlpha(Color.WHITE, 54))
+            cornerRadius = dpToPx(18f).toFloat()
+        }
+    }
+
+    private fun createCategoryPopupBackground(): GradientDrawable {
+        val background = themeOverride?.background ?: Color.rgb(24, 24, 24)
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(colorWithAlpha(background, Color.alpha(background).coerceAtLeast(205)))
+            setStroke(dpToPx(1f), colorWithAlpha(Color.WHITE, 64))
+            cornerRadius = dpToPx(18f).toFloat()
+        }
+    }
+
+    private fun createCategoryPopupRowBackground(isSelected: Boolean): GradientDrawable {
+        val accent = themeOverride?.keyTap ?: Color.WHITE
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(if (isSelected) colorWithAlpha(accent, 105) else Color.TRANSPARENT)
+            cornerRadius = dpToPx(12f).toFloat()
+        }
+    }
+
+    private fun createHintPillBackground(): GradientDrawable {
+        val theme = themeOverride
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(colorWithAlpha(theme?.normalKey ?: Color.rgb(32, 32, 32), 205))
+            setStroke(dpToPx(1f), colorWithAlpha(Color.WHITE, 62))
+            cornerRadius = dpToPx(18f).toFloat()
+        }
+    }
+
+    private fun createTopFadeBackground(): GradientDrawable {
+        // The pinned controls remain visually part of the picker. When the grid
+        // moves behind them, this creates a soft dark veil through the lower half
+        // of the header instead of turning the whole header into a solid bar.
+        val darkSurface = blendColors(themeOverride?.background ?: Color.rgb(24, 24, 24), Color.BLACK, 0.64f)
+        return GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(
+                colorWithAlpha(darkSurface, 190),
+                colorWithAlpha(darkSurface, 142),
+                colorWithAlpha(darkSurface, 0)
+            )
+        )
+    }
+
     private fun createCloseButtonBackground(): GradientDrawable {
         val theme = themeOverride
         return GradientDrawable().apply {
@@ -1283,26 +1916,41 @@ class EmojiPickerView(
         val theme = themeOverride
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            setColor(theme?.suggestion ?: Color.argb(36, 255, 255, 255))
+            setColor(colorWithAlpha(Color.WHITE, if (theme != null) 30 else 36))
             if (theme != null) {
-                setStroke(dpToPx(1f), theme.divider)
+                setStroke(dpToPx(1f), colorWithAlpha(Color.WHITE, 42))
             }
-            cornerRadius = dpToPx(7f).toFloat()
+            cornerRadius = dpToPx(14f).toFloat()
         }
     }
 
     private fun applyTheme() {
         val theme = themeOverride
         val background = theme?.background ?: Color.TRANSPARENT
-        setBackgroundColor(background)
-        vertical.setBackgroundColor(background)
-        recyclerView.setBackgroundColor(background)
-        searchPanel.setBackgroundColor(background)
-        loadingView.setBackgroundColor(background)
-        emptyView.setBackgroundColor(background)
+        // Raycast mode gets its surface from the frosted layer below. An opaque
+        // root background here would hide the theme's translucency completely.
+        val pickerBackground = if (raycastStyle) Color.TRANSPARENT else background
+        setBackgroundColor(pickerBackground)
+        vertical.setBackgroundColor(if (raycastStyle) Color.TRANSPARENT else pickerBackground)
+        frostedBackgroundView.themeColors = theme
+        recyclerView.setBackgroundColor(Color.TRANSPARENT)
+        contentFrame.setBackgroundColor(Color.TRANSPARENT)
+        searchPanel.background = if (raycastStyle) ColorDrawable(Color.TRANSPARENT) else ColorDrawable(background)
+        topFadeView.background = createTopFadeBackground()
+        updateTopFadeVisibility()
+        loadingView.setBackgroundColor(Color.TRANSPARENT)
+        emptyView.setBackgroundColor(Color.TRANSPARENT)
         searchField.setTextColor(theme?.textAndIcons ?: Color.WHITE)
-        searchField.setHintTextColor(colorWithAlpha(theme?.textAndIcons ?: Color.WHITE, 160))
-        searchField.background = createSearchFieldBackground()
+        searchField.setHintTextColor(colorWithAlpha(theme?.textAndIcons ?: Color.WHITE, 145))
+        searchField.background = if (raycastStyle) ColorDrawable(Color.TRANSPARENT) else createSearchFieldBackground()
+        searchBackButton.setColorFilter(colorWithAlpha(theme?.textAndIcons ?: Color.WHITE, 190))
+        categoryLabel.setTextColor(colorWithAlpha(theme?.textAndIcons ?: Color.WHITE, 175))
+        categoryLabel.background = createCategoryChipBackground()
+        updateCategoryChip()
+        bottomHintLeft.setTextColor(colorWithAlpha(theme?.textAndIcons ?: Color.WHITE, 175))
+        bottomHintLeft.background = createHintPillBackground()
+        bottomHintRight.setTextColor(theme?.textAndIcons ?: Color.WHITE)
+        bottomHintRight.background = createHintPillBackground()
         closeButton.setColorFilter(theme?.textAndIcons ?: Color.WHITE)
         closeButton.background = createCloseButtonBackground()
         searchToggleButton.setColorFilter(theme?.textAndIcons ?: Color.WHITE)
@@ -1317,6 +1965,120 @@ class EmojiPickerView(
 
     private fun colorWithAlpha(color: Int, alpha: Int): Int =
         Color.argb(alpha.coerceIn(0, 255), Color.red(color), Color.green(color), Color.blue(color))
+
+    private fun updateTopFadeVisibility() {
+        if (!raycastStyle) {
+            topFadeView.visibility = View.GONE
+            topFadeVisible = false
+            return
+        }
+        val shouldShow = recyclerView.canScrollVertically(-1)
+        if (shouldShow == topFadeVisible) return
+        topFadeVisible = shouldShow
+        topFadeView.visibility = if (shouldShow) View.VISIBLE else View.GONE
+    }
+
+    private fun blendColors(from: Int, to: Int, ratio: Float): Int {
+        val clamped = ratio.coerceIn(0f, 1f)
+        val inverse = 1f - clamped
+        return Color.rgb(
+            (Color.red(from) * inverse + Color.red(to) * clamped).toInt(),
+            (Color.green(from) * inverse + Color.green(to) * clamped).toInt(),
+            (Color.blue(from) * inverse + Color.blue(to) * clamped).toInt()
+        )
+    }
+
+    private fun emojiAccentColor(emoji: String?): Int? {
+        if (emoji.isNullOrEmpty()) return null
+        return when {
+            emoji.containsAny("💕", "💖", "💗", "💓", "💞", "💘", "💝", "💟", "🩷") ->
+                Color.rgb(245, 106, 170)
+            emoji.containsAny("❤", "♥", "💔", "❤️") ->
+                Color.rgb(236, 58, 47)
+            emoji.containsAny("💙", "🩵", "💧", "💦", "🌊", "🥶") ->
+                Color.rgb(78, 153, 255)
+            emoji.containsAny("💚", "✅", "☘", "🌿", "🍀", "🥬") ->
+                Color.rgb(62, 190, 108)
+            emoji.containsAny("💜", "😈", "☂", "🍆") ->
+                Color.rgb(154, 92, 230)
+            emoji.containsAny("🖤", "💀", "♠", "♣") ->
+                Color.rgb(96, 96, 104)
+            emoji.containsAny("🤎", "🍫", "☕", "🪵") ->
+                Color.rgb(151, 91, 48)
+            emoji.containsAny("🧡", "🔥", "🍊", "🎃") ->
+                Color.rgb(245, 128, 43)
+            emoji.containsAny("⭐", "🌟", "✨", "⚡", "💛") ->
+                Color.rgb(247, 200, 65)
+            emoji.containsAny("🌹", "🍎", "🍓", "🍒") ->
+                Color.rgb(225, 53, 61)
+            emoji.codePoints().anyMatch { codePoint -> codePoint in 0x1F600..0x1F64F } ->
+                Color.rgb(246, 187, 55)
+            else -> themeOverride?.keyTap
+        }
+    }
+
+    private fun String.containsAny(vararg needles: String): Boolean {
+        return needles.any { contains(it) }
+    }
+
+    private fun dominantEmojiAccentColor(emoji: String?): Int? {
+        if (emoji.isNullOrEmpty()) return null
+        if (emojiAccentCache.containsKey(emoji)) return emojiAccentCache[emoji]
+        val sampled = runCatching {
+            val size = 40
+            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textAlign = Paint.Align.CENTER
+                textSize = size * 0.72f
+                typeface = customEmojiTypeface ?: Typeface.DEFAULT
+            }
+            val baseline = (size / 2f) - ((paint.descent() + paint.ascent()) / 2f)
+            canvas.drawText(emoji, size / 2f, baseline, paint)
+            val buckets = LinkedHashMap<Int, Int>()
+            val step = 4
+            var y = 0
+            while (y < size) {
+                var x = 0
+                while (x < size) {
+                    val pixel = bitmap.getPixel(x, y)
+                    if (Color.alpha(pixel) > 48) {
+                        val hsv = FloatArray(3)
+                        Color.colorToHSV(pixel, hsv)
+                        if (hsv[1] > 0.22f && hsv[2] > 0.22f) {
+                            val quantized = Color.HSVToColor(floatArrayOf(
+                                (hsv[0] / 18f).toInt() * 18f,
+                                0.78f,
+                                0.92f
+                            ))
+                            buckets[quantized] = (buckets[quantized] ?: 0) + 1
+                        }
+                    }
+                    x += step
+                }
+                y += step
+            }
+            bitmap.recycle()
+            buckets.maxByOrNull { it.value }?.key
+        }.getOrNull()
+        emojiAccentCache[emoji] = sampled
+        return sampled
+    }
+
+    private fun categoryIconRes(categoryId: String): Int {
+        return if (categoryId == WECHAT_EMOJI_CATEGORY_ID) {
+            R.drawable.ic_wechat_emoji_24
+        } else {
+            EmojiRepository.getCategoryIconRes(categoryId)
+        }
+    }
+
+    private fun categoryIconDrawable(iconRes: Int): Drawable? {
+        return context.getDrawable(iconRes)?.mutate()?.apply {
+            setTint(themeOverride?.textAndIcons ?: Color.WHITE)
+            setBounds(0, 0, dpToPx(18f), dpToPx(18f))
+        }
+    }
 
     private fun showVariantsPopup(anchor: View, entry: EmojiRepository.EmojiEntry, categoryId: String) {
         val context = anchor.context
@@ -1440,19 +2202,22 @@ class EmojiPickerView(
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
             return if (viewType == VIEW_TYPE_HEADER) {
-                // Minimal spacer between categories (no text, just 1dp height)
-                val spacer = View(parent.context).apply {
+                val header = TextView(parent.context).apply {
+                    textSize = 12f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(dpToPx(2f), if (raycastStyle) dpToPx(10f) else 0, dpToPx(2f), if (raycastStyle) dpToPx(4f) else 0)
                     layoutParams = RecyclerView.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
-                        dpToPx(1f)
+                        if (raycastStyle) ViewGroup.LayoutParams.WRAP_CONTENT else dpToPx(1f)
                     )
                 }
-                HeaderViewHolder(spacer)
+                HeaderViewHolder(header)
             } else if (viewType == VIEW_TYPE_WECHAT_EMOJI) {
                 val image = ImageView(parent.context).apply {
                     scaleType = ImageView.ScaleType.FIT_CENTER
                     adjustViewBounds = false
-                    setPadding(dpToPx(6f), dpToPx(6f), dpToPx(6f), dpToPx(6f))
+                    background = if (raycastStyle) createEmojiTileBackground() else null
+                    setPadding(dpToPx(8f), dpToPx(8f), dpToPx(8f), dpToPx(8f))
                     layoutParams = RecyclerView.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         emojiSize
@@ -1462,11 +2227,13 @@ class EmojiPickerView(
             } else {
                 val tv = TextView(parent.context).apply {
                     gravity = Gravity.CENTER
+                    background = if (raycastStyle) createEmojiTileBackground() else null
                     minHeight = emojiSize
                     minWidth = emojiSize
+                    includeFontPadding = false
                     layoutParams = RecyclerView.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
+                        emojiSize
                     )
                 }
                 EmojiViewHolder(tv)
@@ -1476,17 +2243,23 @@ class EmojiPickerView(
         override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
             when (val item = getItem(position)) {
                 is SectionItem.Header -> {
-                    // Nothing to bind - it's just a spacer
+                    (holder as HeaderViewHolder).textView.text = if (raycastStyle) "${item.title}   ${item.count}" else ""
+                    holder.textView.setTextColor(colorWithAlpha(themeOverride?.textAndIcons ?: Color.WHITE, 175))
                 }
                 is SectionItem.Emoji -> {
                     (holder as EmojiViewHolder).textView.text = item.entry.base
+                    holder.textView.background = if (raycastStyle) {
+                        if (position == selectedSectionPosition) createSelectedEmojiTileBackground(item.entry.base) else createEmojiTileBackground()
+                    } else {
+                        null
+                    }
                     CustomEmojiFontManager.applyToTextView(
                         context = holder.textView.context,
                         textView = holder.textView,
                         emoji = item.entry.base,
                         fallbackTypeface = Typeface.DEFAULT,
-                        systemTextSizeSp = 28.8f,
-                        customTextSizeSp = 34f
+                        systemTextSizeSp = if (raycastStyle) 34f else 28.8f,
+                        customTextSizeSp = if (raycastStyle) 40f else 34f
                     )
                     holder.textView.setTextColor(themeOverride?.textAndIcons ?: Color.WHITE)
                     holder.textView.setOnClickListener {
@@ -1501,6 +2274,7 @@ class EmojiPickerView(
                 is SectionItem.WechatEmoji -> {
                     val imageView = (holder as WechatEmojiViewHolder).imageView
                     imageView.contentDescription = item.item.title
+                    imageView.background = if (raycastStyle) createEmojiTileBackground() else null
                     imageView.setImageDrawable(loadAssetDrawable(item.item.assetPath))
                     imageView.setOnClickListener {
                         onWechatEmojiSelected(item.item)
@@ -1511,57 +2285,98 @@ class EmojiPickerView(
         }
     }
 
-    private class HeaderViewHolder(view: View) : RecyclerView.ViewHolder(view)
+    private class HeaderViewHolder(val textView: TextView) : RecyclerView.ViewHolder(textView)
     private class EmojiViewHolder(val textView: TextView) : RecyclerView.ViewHolder(textView)
     private class WechatEmojiViewHolder(val imageView: ImageView) : RecyclerView.ViewHolder(imageView)
     private class SearchEmojiViewHolder(val textView: TextView) : RecyclerView.ViewHolder(textView)
 
     private inner class SearchAdapter :
-        ListAdapter<EmojiSearchRepository.EmojiSearchResult, SearchEmojiViewHolder>(SearchResultDiffCallback()) {
+        ListAdapter<EmojiSearchRepository.EmojiSearchResult, RecyclerView.ViewHolder>(SearchResultDiffCallback()) {
+        private val hasResultsHeader: Boolean
+            get() = raycastStyle && currentList.isNotEmpty()
+
+        val firstEmojiAdapterPosition: Int
+            get() = if (hasResultsHeader) 1 else 0
+
+        fun emojiAdapterPosition(resultPosition: Int): Int = resultPosition + firstEmojiAdapterPosition
+
         val spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
-            override fun getSpanSize(position: Int): Int = 1
+            override fun getSpanSize(position: Int): Int =
+                if (getItemViewType(position) == VIEW_TYPE_HEADER) columns else 1
         }
 
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SearchEmojiViewHolder {
+        override fun getItemCount(): Int = super.getItemCount() + if (hasResultsHeader) 1 else 0
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+            if (viewType == VIEW_TYPE_HEADER) {
+                return HeaderViewHolder(TextView(parent.context).apply {
+                    textSize = 12f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(dpToPx(2f), dpToPx(10f), dpToPx(2f), dpToPx(4f))
+                    layoutParams = RecyclerView.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+                })
+            }
             val tv = TextView(parent.context).apply {
                 gravity = Gravity.CENTER
+                background = if (raycastStyle) createEmojiTileBackground() else null
                 minHeight = emojiSize
                 minWidth = emojiSize
+                includeFontPadding = false
                 layoutParams = RecyclerView.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
+                    emojiSize
                 )
             }
             return SearchEmojiViewHolder(tv)
         }
 
-        override fun onBindViewHolder(holder: SearchEmojiViewHolder, position: Int) {
-            val item = getItem(position)
-            holder.textView.text = item.entry.base
+        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+            if (getItemViewType(position) == VIEW_TYPE_HEADER) {
+                (holder as HeaderViewHolder).textView.apply {
+                    text = "Results   ${currentList.size}"
+                    setTextColor(colorWithAlpha(themeOverride?.textAndIcons ?: Color.WHITE, 175))
+                }
+                return
+            }
+            val resultPosition = position - firstEmojiAdapterPosition
+            val item = getItem(resultPosition)
+            val emojiHolder = holder as SearchEmojiViewHolder
+            emojiHolder.textView.text = item.entry.base
+            emojiHolder.textView.background = if (raycastStyle && resultPosition == selectedSearchPosition) {
+                createSelectedEmojiTileBackground(item.entry.base)
+            } else if (raycastStyle) {
+                createEmojiTileBackground()
+            } else {
+                null
+            }
             CustomEmojiFontManager.applyToTextView(
-                context = holder.textView.context,
-                textView = holder.textView,
+                context = emojiHolder.textView.context,
+                textView = emojiHolder.textView,
                 emoji = item.entry.base,
                 fallbackTypeface = Typeface.DEFAULT,
-                systemTextSizeSp = 28.8f,
-                customTextSizeSp = 34f
+                systemTextSizeSp = if (raycastStyle) 34f else 28.8f,
+                customTextSizeSp = if (raycastStyle) 40f else 34f
             )
-            holder.textView.setTextColor(themeOverride?.textAndIcons ?: Color.WHITE)
-            holder.textView.setOnClickListener {
+            emojiHolder.textView.setTextColor(themeOverride?.textAndIcons ?: Color.WHITE)
+            emojiHolder.textView.setOnClickListener {
                 onEmojiSelected(item.entry.base, item.categoryId)
             }
-            holder.textView.setOnLongClickListener {
+            emojiHolder.textView.setOnLongClickListener {
                 if (item.entry.variants.isEmpty()) return@setOnLongClickListener false
-                showVariantsPopup(holder.textView, item.entry, item.categoryId)
+                showVariantsPopup(emojiHolder.textView, item.entry, item.categoryId)
                 true
             }
         }
 
-        override fun getItemViewType(position: Int): Int = VIEW_TYPE_EMOJI
+        override fun getItemViewType(position: Int): Int =
+            if (hasResultsHeader && position == 0) VIEW_TYPE_HEADER else VIEW_TYPE_EMOJI
     }
 
     private sealed class SectionItem {
-        data class Header(val categoryId: String, val title: String) : SectionItem()
+        data class Header(val categoryId: String, val title: String, val count: Int) : SectionItem()
         data class Emoji(val categoryId: String, val entry: EmojiRepository.EmojiEntry) : SectionItem()
         data class WechatEmoji(val item: WechatEmojiItem) : SectionItem()
     }
@@ -1611,6 +2426,45 @@ class EmojiPickerView(
 
     private data class ScrollAnchor(val position: Int, val offset: Int)
 
+    private inner class FrostedBackgroundView(context: Context) : View(context) {
+        private val frostPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        var themeColors: KeyboardThemeColors? = null
+            set(value) {
+                field = value
+                invalidate()
+            }
+
+        init {
+            setWillNotDraw(false)
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val theme = themeColors
+            // A dark translucent surface keeps the themed backdrop visible without
+            // introducing the white/pink wash caused by highlight stops.
+            val intensity = (theme?.frostIntensity ?: 1f).coerceIn(0.45f, 1.4f)
+            val shadeAlpha = (78f * intensity).toInt().coerceIn(44, 112)
+            frostPaint.shader = LinearGradient(
+                0f,
+                0f,
+                width.toFloat(),
+                height.toFloat(),
+                intArrayOf(
+                    Color.argb((shadeAlpha * 0.82f).toInt(), 0, 0, 0),
+                    Color.argb((shadeAlpha * 0.9f).toInt(), 0, 0, 0),
+                    Color.argb(shadeAlpha, 0, 0, 0),
+                    Color.argb((shadeAlpha * 1.06f).toInt().coerceAtMost(128), 0, 0, 0)
+                ),
+                floatArrayOf(0f, 0.42f, 0.72f, 1f),
+                Shader.TileMode.CLAMP
+            )
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), frostPaint)
+            frostPaint.shader = null
+        }
+    }
+
     private fun rebuildIndexCaches(items: List<SectionItem>, categoryIds: List<String>? = null) {
         val headers = mutableMapOf<String, Int>()
         val ids = categoryIds?.toMutableList() ?: ArrayList(items.size)
@@ -1633,7 +2487,7 @@ class EmojiPickerView(
         val recentsTitle = recentCategory.displayNameRes?.let { context.getString(it) }
             ?: EmojiRepository.RECENTS_CATEGORY_ID
         val items = ArrayList<SectionItem>(recentCategory.emojis.size + 1)
-        items.add(SectionItem.Header(EmojiRepository.RECENTS_CATEGORY_ID, recentsTitle))
+        items.add(SectionItem.Header(EmojiRepository.RECENTS_CATEGORY_ID, recentsTitle, recentCategory.emojis.size))
         recentCategory.emojis.forEach { entry ->
             items.add(SectionItem.Emoji(EmojiRepository.RECENTS_CATEGORY_ID, entry))
         }

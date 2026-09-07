@@ -9,6 +9,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.ImageDecoder
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.text.Editable
@@ -21,6 +23,8 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.PopupWindow
+import android.widget.ScrollView
 import android.graphics.drawable.Animatable
 import android.graphics.drawable.Drawable
 import android.widget.EditText
@@ -35,9 +39,11 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import it.palsoftware.pastiera.R
+import it.palsoftware.pastiera.SettingsManager
 import it.palsoftware.pastiera.LocalMediaPickerActivity
 import it.palsoftware.pastiera.StickerPackImportActivity
 import it.palsoftware.pastiera.gif.GifFavoritesManager
+import it.palsoftware.pastiera.gif.GifRecentsManager
 import it.palsoftware.pastiera.gif.KlipyGifClient
 import it.palsoftware.pastiera.gif.KlipyGifResult
 import it.palsoftware.pastiera.gif.KlipyMediaType
@@ -63,6 +69,7 @@ private enum class MediaPickerTab(
     val displayName: String
 ) {
     FAVORITES(null, "Favourites"),
+    RECENTS(null, "Recent"),
     GIFS(KlipyMediaType.GIF, KlipyMediaType.GIF.displayName),
     STICKERS(KlipyMediaType.STICKER, KlipyMediaType.STICKER.displayName),
     LOCAL(KlipyMediaType.LOCAL, KlipyMediaType.LOCAL.displayName),
@@ -83,6 +90,7 @@ class GifPickerView(
     context: Context,
     private val gifClient: KlipyGifClient,
     private val onGifSelected: (KlipyGifResult) -> Unit,
+    private val onExitRequested: (() -> Unit)? = null,
     private val fillParentHeight: Boolean = false
 ) : FrameLayout(context) {
 
@@ -92,6 +100,8 @@ class GifPickerView(
     private val loadingView: ProgressBar
     private val emptyView: TextView
     private val mediaTypeTabs: LinearLayout
+    private val categoryChip: TextView
+    private val sectionLabel: TextView
     private val localFolderBar: LinearLayout
     private val localFolderText: TextView
     private val packBar: LinearLayout
@@ -101,11 +111,15 @@ class GifPickerView(
     private val previewTitleView: TextView
     private val sendButton: TextView
     private val cancelButton: TextView
+    private var mediaCategoryPopup: PopupWindow? = null
     private val favoritesManager = GifFavoritesManager(context)
+    private val recentsManager = GifRecentsManager(context)
+    private val raycastStyle = SettingsManager.getEmojiPickerRaycastStyle(context)
     private val resultAdapter = GifResultAdapter(
         onGifTapped = { showPreview(it) },
         onGifLongPressed = { copyGifLink(it) },
-        onFavoriteToggled = { toggleFavorite(it) }
+        onFavoriteToggled = { toggleFavorite(it) },
+        raycastStyle = raycastStyle
     )
     private val fixedHeight = dpToPx(380f)
     private val smallPadding = dpToPx(6f)
@@ -173,23 +187,21 @@ class GifPickerView(
             hint = context.getString(R.string.gif_picker_search_placeholder)
             setTextColor(Color.WHITE)
             setHintTextColor(Color.argb(160, 255, 255, 255))
-            textSize = 13f
+            textSize = if (raycastStyle) 22f else 13f
             setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT
-            setBackgroundColor(Color.argb(30, 255, 255, 255))
-            val padH = dpToPx(8f)
-            val padV = dpToPx(4f)
+            background = if (raycastStyle) ColorDrawable(Color.TRANSPARENT) else ColorDrawable(Color.argb(30, 255, 255, 255))
+            val padH = dpToPx(if (raycastStyle) 6f else 8f)
+            val padV = dpToPx(if (raycastStyle) 10f else 4f)
             setPadding(padH, padV, padH, padV)
             isCursorVisible = searchInputCaptureEnabled
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 showSoftInputOnFocus = false
             }
             layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
                 ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(smallPadding, smallPadding / 2, smallPadding, 0)
-            }
+            ).apply { weight = 1f }
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
@@ -197,12 +209,35 @@ class GifPickerView(
                     val newQuery = s?.toString().orEmpty()
                     if (newQuery == searchQuery) return
                     searchQuery = newQuery
+                    updateMediaHeader()
                     scheduleSearch()
                 }
             })
             setOnClickListener {
                 setSearchInputCaptureEnabled(true)
             }
+        }
+
+        categoryChip = TextView(context).apply {
+            gravity = Gravity.CENTER
+            textSize = if (raycastStyle) 15f else 11f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            setPadding(dpToPx(12f), 0, dpToPx(10f), 0)
+            background = roundedBackground(Color.argb(48, 255, 255, 255), dpToPx(20f), Color.argb(86, 255, 255, 255))
+            isClickable = true
+            setOnClickListener { mediaCategoryPopup?.dismiss() ?: showMediaCategoryPopup() }
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dpToPx(if (raycastStyle) 46f else 30f)
+            ).apply { marginStart = dpToPx(6f) }
+        }
+
+        sectionLabel = TextView(context).apply {
+            textSize = if (raycastStyle) 14f else 12f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(Color.argb(220, 255, 255, 255))
+            setPadding(dpToPx(10f), dpToPx(if (raycastStyle) 4f else 2f), dpToPx(10f), dpToPx(2f))
         }
 
         mediaTypeTabs = LinearLayout(context).apply {
@@ -259,7 +294,7 @@ class GifPickerView(
             textSize = 14f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.argb(50, 255, 255, 255))
+            background = roundedBackground(Color.argb(50, 255, 255, 255), dpToPx(10f), Color.argb(74, 255, 255, 255))
             setPadding(0, 0, 0, dpToPx(1f))
             layoutParams = LinearLayout.LayoutParams(dpToPx(30f), dpToPx(24f)).apply {
                 marginEnd = dpToPx(3f)
@@ -276,8 +311,12 @@ class GifPickerView(
 
         recyclerView = RecyclerView(context).apply {
             overScrollMode = View.OVER_SCROLL_ALWAYS
-            clipToPadding = true
+            clipToPadding = !raycastStyle
+            itemAnimator = null
             setPadding(smallPadding, smallPadding, smallPadding, smallPadding)
+            if (raycastStyle) {
+                setPadding(smallPadding, smallPadding, smallPadding, dpToPx(52f))
+            }
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 0,
@@ -317,10 +356,17 @@ class GifPickerView(
             visibility = View.GONE
         }
 
-        headerContainer.addView(searchField)
-        headerContainer.addView(mediaTypeTabs)
+        headerContainer.addView(LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dpToPx(8f), dpToPx(if (raycastStyle) 8f else 2f), dpToPx(8f), 0)
+            addView(searchField)
+            addView(categoryChip)
+        })
+        if (!raycastStyle) headerContainer.addView(mediaTypeTabs)
         headerContainer.addView(localFolderBar)
         headerContainer.addView(packBar)
+        headerContainer.addView(sectionLabel)
         vertical.addView(headerContainer)
         vertical.addView(recyclerView)
 
@@ -373,7 +419,10 @@ class GifPickerView(
         }
         sendButton = buildPreviewButton(context.getString(R.string.gif_picker_preview_send, KlipyMediaType.GIF.singularName)).apply {
             setOnClickListener {
-                selectedGif?.let(onGifSelected)
+                selectedGif?.let {
+                    recentsManager.add(it)
+                    onGifSelected(it)
+                }
                 hidePreview()
             }
         }
@@ -393,6 +442,7 @@ class GifPickerView(
         stickerPackReceiverRegistered = true
         updateLocalFolderBar()
         updatePackBar()
+        updateMediaHeader()
 
         refresh()
     }
@@ -595,7 +645,126 @@ class GifPickerView(
             val tab = MediaPickerTab.entries.getOrNull(index) ?: continue
             updateMediaTypeTabStyle(child, tab == selectedMediaTab)
         }
+        updateMediaHeader()
     }
+
+    private fun updateMediaHeader() {
+        categoryChip.text = "${selectedMediaTab.displayName}  ▾"
+        sectionLabel.text = when {
+            searchQuery.isNotBlank() -> "Results"
+            selectedMediaTab == MediaPickerTab.GIFS -> "Trending GIFs"
+            selectedMediaTab == MediaPickerTab.STICKERS -> "Trending Stickers"
+            else -> selectedMediaTab.displayName
+        }
+    }
+
+    private fun showMediaCategoryPopup() {
+        if (mediaCategoryPopup?.isShowing == true) {
+            mediaCategoryPopup?.dismiss()
+            return
+        }
+        val popupWidth = minOf(context.resources.displayMetrics.widthPixels - dpToPx(24f), dpToPx(280f))
+        val popupMaxHeight = dpToPx(260f)
+        val rowHeight = dpToPx(46f)
+        var popup: PopupWindow? = null
+        val list = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(8f), dpToPx(8f), dpToPx(8f), dpToPx(8f))
+        }
+        fun addRow(label: String, iconRes: Int, selected: Boolean, onClick: () -> Unit) {
+            list.addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dpToPx(12f), 0, dpToPx(12f), 0)
+                background = roundedBackground(
+                    if (selected) Color.argb(105, 255, 255, 255) else Color.TRANSPARENT,
+                    dpToPx(12f)
+                )
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, rowHeight).apply {
+                    setMargins(0, dpToPx(2f), 0, dpToPx(2f))
+                }
+                setOnClickListener {
+                    onClick()
+                    popup?.dismiss()
+                }
+                addView(ImageView(context).apply {
+                    setImageResource(iconRes)
+                    setColorFilter(Color.WHITE)
+                    layoutParams = LinearLayout.LayoutParams(dpToPx(24f), dpToPx(24f)).apply {
+                        marginEnd = dpToPx(12f)
+                    }
+                })
+                addView(TextView(context).apply {
+                    text = label
+                    gravity = Gravity.CENTER_VERTICAL
+                    textSize = 16f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setTextColor(Color.WHITE)
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+                })
+            })
+        }
+        addRow("Emoji", R.drawable.ic_emoji_emotions_24, false) {
+            this@GifPickerView.post { onExitRequested?.invoke() }
+        }
+        MediaPickerTab.entries.forEach { tab ->
+            val icon = when (tab) {
+                MediaPickerTab.FAVORITES -> R.drawable.ic_star_24
+                MediaPickerTab.GIFS -> R.drawable.ic_media_24
+                MediaPickerTab.STICKERS -> R.drawable.ic_sticker_24
+                MediaPickerTab.LOCAL -> R.drawable.ic_folder_24
+                MediaPickerTab.PACKS -> R.drawable.ic_layers_24
+                MediaPickerTab.RECENTS -> R.drawable.ic_schedule_24
+            }
+            addRow(tab.displayName, icon, tab == selectedMediaTab) {
+                if (tab != selectedMediaTab) {
+                    this@GifPickerView.post {
+                        selectedMediaTab = tab
+                        refreshMediaTypeTabs()
+                        updateLocalFolderBar()
+                        updatePackBar()
+                        refresh()
+                    }
+                }
+            }
+        }
+        val scrollView = ScrollView(context).apply {
+            isVerticalScrollBarEnabled = false
+            background = roundedBackground(
+                Color.argb(205, 24, 24, 24),
+                dpToPx(18f),
+                Color.argb(64, 255, 255, 255)
+            )
+            clipToOutline = true
+            addView(list)
+        }
+        list.measure(
+            MeasureSpec.makeMeasureSpec(popupWidth, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+        )
+        val popupHeight = minOf(popupMaxHeight, list.measuredHeight)
+        popup = PopupWindow(scrollView, popupWidth, popupHeight, false).apply {
+            isTouchable = true
+            isOutsideTouchable = false
+            inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                isTouchModal = false
+            }
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            elevation = dpToPx(8f).toFloat()
+            showAsDropDown(categoryChip, 0, dpToPx(6f), Gravity.END)
+        }
+        mediaCategoryPopup = popup
+        popup.setOnDismissListener { mediaCategoryPopup = null }
+    }
+
+    private fun roundedBackground(color: Int, radius: Int, strokeColor: Int? = null): GradientDrawable =
+        GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = radius.toFloat()
+            setColor(color)
+            strokeColor?.let { setStroke(dpToPx(1f), it) }
+        }
 
     private fun updateMediaTypeTabStyle(view: TextView, selected: Boolean) {
         view.setBackgroundColor(if (selected) Color.argb(60, 255, 255, 255) else Color.argb(20, 255, 255, 255))
@@ -629,7 +798,11 @@ class GifPickerView(
                 ellipsize = TextUtils.TruncateAt.END
                 setTextColor(Color.WHITE)
                 setPadding(dpToPx(6f), dpToPx(3f), dpToPx(6f), dpToPx(3f))
-                setBackgroundColor(if (selected) Color.argb(70, 255, 255, 255) else Color.argb(24, 255, 255, 255))
+                background = roundedBackground(
+                    if (selected) Color.argb(70, 255, 255, 255) else Color.argb(24, 255, 255, 255),
+                    dpToPx(10f),
+                    if (selected) Color.argb(100, 255, 255, 255) else null
+                )
                 layoutParams = LinearLayout.LayoutParams(0, dpToPx(24f), 1f).apply {
                     marginStart = dpToPx(2f)
                     marginEnd = dpToPx(2f)
@@ -664,7 +837,7 @@ class GifPickerView(
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
             textSize = 13f
-            setBackgroundColor(Color.argb(38, 255, 255, 255))
+            background = roundedBackground(Color.argb(38, 255, 255, 255), dpToPx(14f), Color.argb(74, 255, 255, 255))
             setPadding(dpToPx(18f), dpToPx(10f), dpToPx(18f), dpToPx(10f))
             layoutParams = LinearLayout.LayoutParams(
                 0,
@@ -708,7 +881,7 @@ class GifPickerView(
     }
 
     private fun maybeLoadNextPage() {
-        if (selectedMediaTab.mediaType == null || selectedMediaTab == MediaPickerTab.LOCAL || selectedMediaTab == MediaPickerTab.PACKS || loadingPage || reachedEnd || currentItems.isEmpty()) return
+        if (selectedMediaTab.mediaType == null || selectedMediaTab == MediaPickerTab.LOCAL || selectedMediaTab == MediaPickerTab.PACKS || selectedMediaTab == MediaPickerTab.RECENTS || loadingPage || reachedEnd || currentItems.isEmpty()) return
         val layoutManager = recyclerView.layoutManager as? GridLayoutManager ?: return
         val lastVisible = layoutManager.findLastVisibleItemPosition()
         if (lastVisible >= currentItems.size - (columns * 2)) {
@@ -741,6 +914,10 @@ class GifPickerView(
                 when {
                     tabSnapshot == MediaPickerTab.FAVORITES && querySnapshot.isBlank() -> favoritesManager.getFavorites()
                     tabSnapshot == MediaPickerTab.FAVORITES -> favoritesManager.getFavorites().filter {
+                        it.title.contains(querySnapshot, ignoreCase = true)
+                    }
+                    tabSnapshot == MediaPickerTab.RECENTS && querySnapshot.isBlank() -> recentsManager.getRecents()
+                    tabSnapshot == MediaPickerTab.RECENTS -> recentsManager.getRecents().filter {
                         it.title.contains(querySnapshot, ignoreCase = true)
                     }
                     typeSnapshot == KlipyMediaType.LOCAL && querySnapshot.isBlank() -> localMediaRepository.getItems()
@@ -852,46 +1029,51 @@ class GifPickerView(
 private class GifResultAdapter(
     private val onGifTapped: (KlipyGifResult) -> Unit,
     private val onGifLongPressed: (KlipyGifResult) -> Unit,
-    private val onFavoriteToggled: (KlipyGifResult) -> Unit
+    private val onFavoriteToggled: (KlipyGifResult) -> Unit,
+    private val raycastStyle: Boolean
 ) : ListAdapter<KlipyGifResult, GifResultViewHolder>(GifResultDiffCallback) {
     var favoriteKeys: Set<String> = emptySet()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): GifResultViewHolder {
         val context = parent.context
-        val container = FrameLayout(context).apply {
-            setBackgroundColor(Color.argb(26, 255, 255, 255))
-            val padding = dpToPx(context, 3f)
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            background = roundedDrawable(
+                if (raycastStyle) Color.argb(42, 255, 255, 255) else Color.argb(26, 255, 255, 255),
+                dpToPx(context, if (raycastStyle) 14f else 6f)
+            )
+            val padding = dpToPx(context, if (raycastStyle) 4f else 3f)
             setPadding(padding, padding, padding, padding)
             layoutParams = RecyclerView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         }
+        val previewContainer = FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dpToPx(context, if (raycastStyle) 106f else 88f)
+            )
+        }
         val preview = ImageView(context).apply {
             scaleType = ImageView.ScaleType.FIT_CENTER
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dpToPx(context, 88f)
+                ViewGroup.LayoutParams.MATCH_PARENT
             )
-            setBackgroundColor(Color.argb(35, 255, 255, 255))
+            background = roundedDrawable(Color.argb(30, 255, 255, 255), dpToPx(context, if (raycastStyle) 11f else 4f))
         }
         val title = TextView(context).apply {
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.argb(135, 0, 0, 0))
-            textSize = 8f
+            textSize = if (raycastStyle) 11f else 8f
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dpToPx(context, 3f), 0, dpToPx(context, 3f), 0)
-            layoutParams = FrameLayout.LayoutParams(
+            setPadding(dpToPx(context, 3f), dpToPx(context, if (raycastStyle) 5f else 0f), dpToPx(context, 3f), 0)
+            layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dpToPx(context, 14f),
-                Gravity.BOTTOM
-            ).apply {
-                leftMargin = dpToPx(context, 3f)
-                rightMargin = dpToPx(context, 3f)
-                bottomMargin = dpToPx(context, 3f)
-            }
+                dpToPx(context, if (raycastStyle) 22f else 14f)
+            )
         }
         val favoriteButton = TextView(context).apply {
             gravity = Gravity.CENTER
@@ -907,9 +1089,10 @@ private class GifResultAdapter(
                 rightMargin = dpToPx(context, 5f)
             }
         }
-        container.addView(preview)
+        previewContainer.addView(preview)
+        previewContainer.addView(favoriteButton)
+        container.addView(previewContainer)
         container.addView(title)
-        container.addView(favoriteButton)
         return GifResultViewHolder(container, preview, title, favoriteButton, onGifTapped, onGifLongPressed, onFavoriteToggled)
     }
 
@@ -922,6 +1105,12 @@ private class GifResultAdapter(
         holder.clear()
         super.onViewRecycled(holder)
     }
+}
+
+private fun roundedDrawable(color: Int, radius: Int): GradientDrawable = GradientDrawable().apply {
+    shape = GradientDrawable.RECTANGLE
+    cornerRadius = radius.toFloat()
+    setColor(color)
 }
 
 private class GifResultViewHolder(
@@ -940,7 +1129,7 @@ private class GifResultViewHolder(
             onGifLongPressed(item)
             true
         }
-        favoriteButton.visibility = if (item.isLocal || item.mediaType == KlipyMediaType.LOCAL) View.GONE else View.VISIBLE
+        favoriteButton.visibility = View.VISIBLE
         favoriteButton.text = if (isFavorite) "\u2605" else "\u2606"
         favoriteButton.contentDescription = if (isFavorite) {
             itemView.context.getString(R.string.gif_picker_remove_favorite)
@@ -996,7 +1185,11 @@ private object GifPreviewLoader {
         }
         imageView.setImageDrawable(null)
         scope.launch {
-            val bytes = withContext(Dispatchers.IO) { downloadBytes(url) }
+            val bytes = try {
+                withContext(Dispatchers.IO) { downloadBytes(url) }
+            } catch (_: Exception) {
+                null
+            }
             if (imageView.tag == url && bytes != null) {
                 byteCache.put(url, bytes)
                 setDecodedPreview(imageView, url, bytes)

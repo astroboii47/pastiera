@@ -24,7 +24,6 @@ class GifFavoritesManager(context: Context) {
     }
 
     fun toggleFavorite(item: KlipyGifResult): Boolean {
-        if (item.isLocal || item.mediaType == KlipyMediaType.LOCAL) return false
         val key = favoriteKey(item)
         val existing = getFavorites().filterNot { favoriteKey(it) == key }.toMutableList()
         val isAdding = existing.size == getFavorites().size
@@ -57,7 +56,6 @@ class GifFavoritesManager(context: Context) {
         val mediaType = runCatching {
             KlipyMediaType.valueOf(optString("mediaType"))
         }.getOrNull() ?: return null
-        if (mediaType == KlipyMediaType.LOCAL) return null
         return KlipyGifResult(
             id = optString("id"),
             title = optString("title"),

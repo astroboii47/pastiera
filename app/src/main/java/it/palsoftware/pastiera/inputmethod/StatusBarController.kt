@@ -1139,6 +1139,7 @@ class StatusBarController(
             onKeyboardLayoutRequested = if (softwareKeyboardHeight != null) onEmojiPickerRequested else null
         )
         view.setInputConnection(inputConnection)
+        view.activateSearchOnOpen()
         var handledInlineMediaSearch = false
         if (openMediaTabOnNextEmojiPickerRender) {
             view.showMediaTab()
@@ -2717,6 +2718,8 @@ class StatusBarController(
         val activeColors = activeTheme.toKeyboardThemeColors()
         val softwareThemeSettings = if (isFullSoftwareKeyboardMode) activeTheme else softwareTheme()
         val unifiedModeEnabled = SettingsManager.getUnifiedSuggestionsVariationsBar(context)
+        (statusBarLayout as? ImeChromeLayout)?.suppressFrostHighlights =
+            snapshot.symPage in listOf(4, 5) && SettingsManager.getEmojiPickerRaycastStyle(context)
         variationBarView?.onVariationSelectedListener = onVariationSelectedListener
         variationBarView?.onCursorMovedListener = onCursorMovedListener
         variationBarView?.onSuggestionCommitted = onSuggestionCommitted
@@ -2933,11 +2936,17 @@ class StatusBarController(
             }
             variationsBar?.resetVariationsState()
 
-            // Pin background to opaque IME color and hide variations so SYM animates on a solid canvas.
+            val useTransparentEmojiPickerSurface =
+                snapshot.symPage in listOf(4, 5) &&
+                    SettingsManager.getEmojiPickerRaycastStyle(context)
+
+            // Classic SYM pages keep a solid canvas. Raycast emoji mode lets the
+            // existing IME chrome frost layer show through instead.
             if (layout.background !is ColorDrawable) {
                 layout.background = ColorDrawable(activeColors.background)
             }
-            (layout.background as? ColorDrawable)?.alpha = Color.alpha(activeColors.background)
+            (layout.background as? ColorDrawable)?.alpha =
+                if (useTransparentEmojiPickerSurface) 0 else Color.alpha(activeColors.background)
             if (isSoftwareKeyboardOverlayPage) {
                 variationsWrapperView?.apply {
                     visibility = View.VISIBLE
@@ -2965,7 +2974,10 @@ class StatusBarController(
             )
             val surfaceHeight = resolveSurfaceHeightWithOptionalLed(symHeight, showLedStrip)
             lastSymHeight = surfaceHeight
-            emojiKeyboardView.setBackgroundColor(activeColors.background)
+            val surfaceColor = if (useTransparentEmojiPickerSurface) Color.TRANSPARENT else activeColors.background
+            symSurfaceStackView.setBackgroundColor(surfaceColor)
+            symSurfaceView.setBackgroundColor(surfaceColor)
+            emojiKeyboardView.setBackgroundColor(surfaceColor)
             emojiKeyboardView.visibility = View.VISIBLE
             applySymSurfaceLayout(symSurfaceView, symSurfaceStackView, emojiKeyboardView, surfaceHeight, reserveLedSpace = showLedStrip)
             setSurfaceCloseVisible(snapshot.symPage in 1..2)
@@ -3249,12 +3261,10 @@ class StatusBarController(
 
     private class ImeChromeLayout(context: Context) : LinearLayout(context) {
         private val frostPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val noisePaint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = context.resources.displayMetrics.density
         }
-        private val noiseStepPx = (9f * context.resources.displayMetrics.density).coerceAtLeast(6f)
 
         var themeColors: KeyboardThemeColors? = null
             set(value) {
@@ -3274,6 +3284,12 @@ class StatusBarController(
                 field = value
                 requestLayout()
             }
+        var suppressFrostHighlights: Boolean = false
+            set(value) {
+                if (field == value) return
+                field = value
+                invalidate()
+            }
 
         init {
             setChildrenDrawingOrderEnabled(true)
@@ -3286,6 +3302,7 @@ class StatusBarController(
         }
 
         private fun drawFrostedLayer(canvas: Canvas) {
+            if (suppressFrostHighlights) return
             val theme = themeColors ?: return
             val backgroundAlpha = Color.alpha(theme.background)
             val intensity = theme.frostIntensity.coerceIn(0f, 2f)
@@ -3306,19 +3323,6 @@ class StatusBarController(
             )
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), frostPaint)
             frostPaint.shader = null
-
-            noisePaint.color = Color.argb((22f * intensity).toInt().coerceIn(0, 72), 255, 255, 255)
-            val columns = (width / noiseStepPx).toInt() + 2
-            val rows = (height / noiseStepPx).toInt() + 2
-            for (row in 0 until rows) {
-                for (column in 0 until columns) {
-                    val seed = (row * 37 + column * 19) % 11
-                    if (seed > 3) continue
-                    val x = column * noiseStepPx + ((seed * 0.37f) % 1f) * noiseStepPx
-                    val y = row * noiseStepPx + ((seed * 0.61f) % 1f) * noiseStepPx
-                    canvas.drawCircle(x, y, (0.5f + 0.25f * intensity) * resources.displayMetrics.density, noisePaint)
-                }
-            }
 
             strokePaint.color = Color.argb((54f * intensity).toInt().coerceIn(0, 140), 255, 255, 255)
             canvas.drawLine(0f, 0.5f, width.toFloat(), 0.5f, strokePaint)

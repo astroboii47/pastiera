@@ -150,7 +150,7 @@ class InputEventRouter(
             !ctrlLatchActive &&
             event?.isSymPressed == true &&
             SettingsManager.getQuickLauncherTextFieldShortcuts(context) &&
-            SettingsManager.isQuickLauncherShortcut(context, keyCode)
+            SettingsManager.isQuickLauncherShortcutEnabled(context, keyCode)
         ) {
             if (powerShortcutsEnabled && callbacks.handlePowerShortcut(keyCode)) {
                 return true

@@ -25,9 +25,9 @@ class Q25MessengerFocusAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.packageName?.toString() != MESSENGER_PACKAGE) return
-        if (!SettingsManager.getQ25MessengerFocusFixEnabled(this)) return
 
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            if (!SettingsManager.getQ25MessengerFocusFixEnabled(this)) return
             if (isComposerClick(event.source)) {
                 armedUntilMs = System.currentTimeMillis() + ARMED_WINDOW_MS
                 Log.d(TAG, "Armed Messenger composer refocus")
@@ -36,6 +36,7 @@ class Q25MessengerFocusAccessibilityService : AccessibilityService() {
             return
         }
 
+        if (!SettingsManager.getQ25MessengerFocusFixEnabled(this)) return
         if (System.currentTimeMillis() > armedUntilMs) return
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,

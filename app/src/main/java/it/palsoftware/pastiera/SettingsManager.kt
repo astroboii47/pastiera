@@ -105,6 +105,7 @@ object SettingsManager {
     private const val KEY_ALT_LATCH_STAYS_ON_SPACE = "alt_latch_stays_on_space"
     private const val KEY_CTRL_LATCH_STAYS_ON_SPACE = "ctrl_latch_stays_on_space"
     private const val KEY_EMOJI_PICKER_EXPANDED_HEIGHT = "emoji_picker_expanded_height"
+    private const val KEY_EMOJI_PICKER_RAYCAST_STYLE = "emoji_picker_raycast_style"
     private const val KEY_EMOJI_PICKER_CUSTOM_FONT_ENABLED = "emoji_picker_custom_font_enabled"
     private const val KEY_EMOJI_PICKER_CUSTOM_FONT_PATH = "emoji_picker_custom_font_path"
     private const val KEY_EMOJI_PICKER_CUSTOM_FONT_NAME = "emoji_picker_custom_font_name"
@@ -353,6 +354,7 @@ object SettingsManager {
     private const val DEFAULT_BOUNCE_KEYS_ENTER_ENABLED = true
     private const val DEFAULT_BOUNCE_KEYS_BACKSPACE_ENABLED = true
     private const val DEFAULT_EMOJI_PICKER_EXPANDED_HEIGHT = true
+    private const val DEFAULT_EMOJI_PICKER_RAYCAST_STYLE = true
     private val DEFAULT_SYM_PAGES_CONFIG = SymPagesConfig()
     private const val DEFAULT_STATIC_VARIATION_BAR_MODE = false
     private const val DEFAULT_UNIFIED_SUGGESTIONS_VARIATIONS_BAR = false
@@ -3354,6 +3356,7 @@ object SettingsManager {
     }
     
     private const val KEY_LAUNCHER_SHORTCUTS = "launcher_shortcuts"
+    private const val KEY_QUICK_LAUNCHER_ENABLED = "quick_launcher_enabled"
     private const val KEY_LAUNCHER_SHORTCUTS_ENABLED = "launcher_shortcuts_enabled"
     private const val KEY_QUICK_LAUNCHER_DEFAULT_ASSIGNED = "quick_launcher_default_assigned"
     private const val KEY_QUICK_LAUNCHER_AUTO_START_SINGLE = "quick_launcher_auto_start_single"
@@ -3374,6 +3377,7 @@ object SettingsManager {
     private const val KEY_QUICK_LAUNCHER_STATIC_TOP_HIGHLIGHT = "quick_launcher_static_top_highlight"
     private const val KEY_QUICK_LAUNCHER_STATIC_TOP_HIGHLIGHT_COLOR = "quick_launcher_static_top_highlight_color"
     private const val DEFAULT_LAUNCHER_SHORTCUTS_ENABLED = false
+    private const val DEFAULT_QUICK_LAUNCHER_ENABLED = true
     private const val DEFAULT_QUICK_LAUNCHER_AUTO_START_SINGLE = false
     private const val DEFAULT_QUICK_LAUNCHER_LIMIT_RESULTS = false
     private const val DEFAULT_QUICK_LAUNCHER_TEXT_FIELD_SHORTCUTS = true
@@ -3650,6 +3654,10 @@ object SettingsManager {
         return getLauncherShortcut(context, keyCode)?.isQuickLauncherCommand() == true
     }
 
+    fun isQuickLauncherShortcutEnabled(context: Context, keyCode: Int): Boolean {
+        return getQuickLauncherEnabled(context) && isQuickLauncherShortcut(context, keyCode)
+    }
+
     private fun LauncherShortcut.isQuickLauncherCommand(): Boolean {
         return type == LauncherShortcut.TYPE_QUICK_LAUNCHER ||
             commandId == PastieraCommandSource.COMMAND_QUICK_LAUNCHER ||
@@ -3851,6 +3859,19 @@ object SettingsManager {
     fun setQuickLauncherStaticTopHighlightColor(context: Context, color: Int) {
         getPreferences(context).edit()
             .putInt(KEY_QUICK_LAUNCHER_STATIC_TOP_HIGHLIGHT_COLOR, color)
+            .apply()
+    }
+
+    fun getQuickLauncherEnabled(context: Context): Boolean {
+        return getPreferences(context).getBoolean(
+            KEY_QUICK_LAUNCHER_ENABLED,
+            DEFAULT_QUICK_LAUNCHER_ENABLED
+        )
+    }
+
+    fun setQuickLauncherEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_QUICK_LAUNCHER_ENABLED, enabled)
             .apply()
     }
     
@@ -4781,6 +4802,19 @@ object SettingsManager {
     fun setEmojiPickerExpandedHeight(context: Context, enabled: Boolean) {
         getPreferences(context).edit()
             .putBoolean(KEY_EMOJI_PICKER_EXPANDED_HEIGHT, enabled)
+            .apply()
+    }
+
+    fun getEmojiPickerRaycastStyle(context: Context): Boolean {
+        return getPreferences(context).getBoolean(
+            KEY_EMOJI_PICKER_RAYCAST_STYLE,
+            DEFAULT_EMOJI_PICKER_RAYCAST_STYLE
+        )
+    }
+
+    fun setEmojiPickerRaycastStyle(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_EMOJI_PICKER_RAYCAST_STYLE, enabled)
             .apply()
     }
 

@@ -168,6 +168,22 @@ class ModifierStateControllerTest {
     }
 
     @Test
+    fun clearTransientAltState_removesOrphanedPressButPreservesExplicitLatch() {
+        val controller = ModifierStateController(doubleTapThreshold)
+        controller.altLatchActive = true
+        controller.altOneShot = true
+        controller.altPressed = true
+        controller.altPhysicallyPressed = true
+
+        controller.clearTransientAltState()
+
+        assertTrue(controller.altLatchActive)
+        assertFalse(controller.altOneShot)
+        assertFalse(controller.altPressed)
+        assertFalse(controller.altPhysicallyPressed)
+    }
+
+    @Test
     fun testCtrlOneShotAndLatchTransitions() {
         val controller = ModifierStateController(doubleTapThreshold)
 

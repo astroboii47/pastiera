@@ -129,6 +129,10 @@ class QuickLauncherActivity : LocalizedComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!SettingsManager.getQuickLauncherEnabled(this)) {
+            finish()
+            return
+        }
         disableActivityAnimations()
         window.requestFeature(android.view.Window.FEATURE_NO_TITLE)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
@@ -369,7 +373,7 @@ class QuickLauncherActivity : LocalizedComponentActivity() {
     }
 
     private fun isSymQuickLauncherToggle(keyCode: Int, event: KeyEvent?): Boolean {
-        return SettingsManager.isQuickLauncherShortcut(this, keyCode) &&
+        return SettingsManager.isQuickLauncherShortcutEnabled(this, keyCode) &&
             event?.isSymPressed == true
     }
 

@@ -12,6 +12,9 @@ object QuickLauncherOpener {
     private val NIAGARA_SEARCH_URI: Uri = Uri.parse("niagara://search")
 
     fun open(context: Context): Boolean {
+        if (!SettingsManager.getQuickLauncherEnabled(context)) {
+            return false
+        }
         return when (SettingsManager.getQuickLauncherBehavior(context)) {
             SettingsManager.QUICK_LAUNCHER_BEHAVIOR_NIAGARA ->
                 openNiagaraSearch(context) || openPastieraQuickLauncher(context)

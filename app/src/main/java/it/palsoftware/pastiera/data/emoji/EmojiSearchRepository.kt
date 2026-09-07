@@ -190,6 +190,11 @@ object EmojiSearchRepository {
                     )
                 }
 
+                // Keep the canonical red heart ahead of related heart emoji for a direct search.
+                if (entry.base == "❤️") {
+                    terms.putIfAbsent("heart", SearchTerm("heart", TermKind.NAME, false))
+                }
+
                 // If no metadata is available, still index the literal emoji string as a fallback.
                 if (terms.isEmpty()) {
                     val literal = normalizeSearchText(entry.base)
